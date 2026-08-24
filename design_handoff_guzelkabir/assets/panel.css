@@ -1,0 +1,144 @@
+/* ===========================================================
+   GüzelKabir — Müşteri paneli  ·  C · Modern Sakin
+   themes.css + base.css üzerine kurulu
+   =========================================================== */
+
+body.panel { background: var(--bg); }
+
+.panel-wrap { max-width: 1160px; margin-inline: auto; padding: clamp(28px, 4vw, 48px) var(--gutter) 90px; }
+
+/* ---------- selam başlığı ---------- */
+.greet { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 30px; }
+.greet h1 { font-family: var(--font-display); font-weight: var(--display-weight); font-size: clamp(1.8rem, 3.2vw, 2.5rem); letter-spacing: var(--h-tracking); }
+.greet .gsub { color: var(--ink-2); margin-top: 4px; }
+.greet .gstat { display: inline-flex; align-items: center; gap: 9px; font-size: .88rem; font-weight: 600; color: var(--primary-deep); background: color-mix(in srgb, var(--primary) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--line)); padding: .55em 1em; border-radius: var(--r-pill); }
+.greet .gstat .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); position: relative; }
+.greet .gstat .pulse::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1.5px solid var(--primary); opacity: .5; animation: ring 1.8s ease-out infinite; }
+@keyframes ring { 0% { transform: scale(.6); opacity: .6; } 100% { transform: scale(1.8); opacity: 0; } }
+
+/* ---------- panel grid ---------- */
+.panel-grid { display: grid; grid-template-columns: 1fr 340px; gap: clamp(22px, 3vw, 38px); align-items: start; }
+
+.block { margin-bottom: 34px; }
+.block-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.block-head h2 { font-family: var(--font-display); font-weight: var(--display-weight); font-size: 1.35rem; letter-spacing: var(--h-tracking); }
+.block-head .count { font-size: .82rem; color: var(--ink-3); }
+
+/* ---------- onay bekleyen kart (vurgulu) ---------- */
+.approve-card {
+  display: grid; grid-template-columns: 280px 1fr; gap: 0;
+  border: 1.5px solid var(--primary); border-radius: var(--radius); overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 28px 56px -34px rgba(40,55,30,.5);
+}
+.approve-card .ba { aspect-ratio: auto; height: 100%; min-height: 220px; border-radius: 0; border: none; }
+.approve-card .ac-body { padding: 24px 26px 26px; display: flex; flex-direction: column; }
+.ac-badge { align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--primary-deep); background: color-mix(in srgb, var(--primary) 12%, var(--surface)); padding: .45em .85em; border-radius: var(--r-pill); margin-bottom: 12px; }
+.approve-card h3 { font-family: var(--font-display); font-weight: var(--display-weight); font-size: 1.35rem; margin-bottom: 4px; }
+.approve-card .ac-meta { font-size: .88rem; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 16px; }
+.approve-card .ac-meta span { display: inline-flex; align-items: center; gap: .45em; }
+.approve-card .ac-meta svg { color: var(--primary); flex: none; }
+.approve-card .ac-actions { margin-top: auto; display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* ---------- aktif / geçmiş liste ---------- */
+.care-list { display: flex; flex-direction: column; gap: 12px; }
+.care-row {
+  display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 18px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 18px 14px 14px; cursor: pointer;
+  transition: border-color .2s, transform .2s var(--ease), box-shadow .2s;
+}
+.care-row:hover { border-color: var(--primary); transform: translateX(2px); box-shadow: 0 14px 30px -22px rgba(40,55,30,.4); }
+.care-row .thumb { width: 64px; height: 64px; border-radius: var(--radius-sm); }
+.care-row .thumb.ph::after { display: none; }
+.care-row .cr-main h4 { font-family: var(--font-display); font-weight: var(--display-weight); font-size: 1.1rem; }
+.care-row .cr-main p { font-size: .84rem; color: var(--ink-2); margin-top: 2px; }
+.care-row .cr-side { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.care-row .cr-date { font-size: .8rem; color: var(--ink-3); font-family: "IBM Plex Mono", monospace; }
+.pill { font-size: .72rem; font-weight: 700; padding: .35em .7em; border-radius: var(--r-pill); letter-spacing: .02em; }
+.pill.done { background: color-mix(in srgb, var(--primary) 13%, var(--surface)); color: var(--primary-deep); }
+.pill.wait { background: #f0e6cf; color: #8a6d1f; }
+.pill.scheduled { background: color-mix(in srgb, var(--ink-2) 12%, var(--surface)); color: var(--ink-2); }
+[data-theme] .pill.done svg { vertical-align: -2px; }
+
+/* ---------- sağ aside ---------- */
+.aside-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 22px 24px; margin-bottom: 18px; }
+.aside-card h3 { font-family: var(--font-display); font-weight: var(--display-weight); font-size: 1.2rem; margin-bottom: 4px; }
+.aside-card .plan-tag { display: inline-flex; align-items: center; gap: 7px; font-size: .78rem; font-weight: 700; color: var(--primary-deep); margin-bottom: 14px; }
+.sub-line { display: flex; justify-content: space-between; padding: 8px 0; font-size: .9rem; border-bottom: 1px dashed var(--line-soft); }
+.sub-line:last-of-type { border-bottom: none; }
+.sub-line .k { color: var(--ink-2); }
+.sub-line .v { font-weight: 600; }
+.sub-actions { display: flex; gap: 10px; margin-top: 16px; }
+.sub-actions .btn { flex: 1; justify-content: center; padding-block: .7em; font-size: .9rem; }
+.btn-quiet { border: 1px solid var(--line); color: var(--ink-2); background: var(--surface); border-radius: var(--r-pill); }
+.btn-quiet:hover { border-color: var(--primary); color: var(--primary-deep); }
+.btn-danger { border: 1px solid color-mix(in srgb, #a8472f 40%, var(--line)); color: #a8472f; background: var(--surface); border-radius: var(--r-pill); }
+.btn-danger:hover { background: color-mix(in srgb, #a8472f 8%, var(--surface)); }
+.sub-state { display: none; margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-sm); font-size: .85rem; }
+.sub-state.show { display: block; }
+.sub-state.paused { background: #f0e6cf; color: #7a611c; }
+.sub-state.cancel { background: color-mix(in srgb, #a8472f 9%, var(--surface)); color: #8a3a26; }
+
+/* anı / hatırlatma kartı */
+.aside-card.memory { background: color-mix(in srgb, var(--primary) 6%, var(--surface)); border-color: color-mix(in srgb, var(--primary) 24%, var(--line)); }
+.aside-card .anniv { display: flex; gap: 12px; align-items: flex-start; font-size: .88rem; color: var(--ink-2); line-height: 1.5; }
+.aside-card .anniv .ic { width: 34px; height: 34px; flex: none; border-radius: 50%; background: var(--surface); border: 1px solid var(--line); display: grid; place-items: center; color: var(--primary); }
+
+/* ===========================================================
+   DETAY OVERLAY
+   =========================================================== */
+.overlay { position: fixed; inset: 0; z-index: 80; display: none; }
+.overlay.open { display: block; }
+.overlay-bg { position: absolute; inset: 0; background: rgba(28,33,26,.5); backdrop-filter: blur(3px); animation: fade .3s ease; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.overlay-panel {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(640px, 94vw);
+  background: var(--bg); overflow-y: auto;
+  box-shadow: -30px 0 80px -30px rgba(0,0,0,.5);
+  animation: slideIn .4s var(--ease);
+}
+@keyframes slideIn { from { transform: translateX(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+.ov-head { display: flex; align-items: center; justify-content: space-between; padding: 20px 28px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(8px); z-index: 2; }
+.ov-head h2 { font-family: var(--font-display); font-weight: var(--display-weight); font-size: 1.3rem; }
+.ov-close { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink-2); transition: all .2s; }
+.ov-close:hover { border-color: var(--primary); color: var(--ink); }
+.ov-body { padding: 24px 28px 40px; }
+.ov-body .ba { aspect-ratio: 16 / 11; margin-bottom: 18px; }
+.ov-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.ov-meta .m { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; }
+.ov-meta .m .lbl { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; }
+.ov-meta .m .val { font-size: .95rem; font-weight: 600; margin-top: 3px; }
+.ov-meta .m .val.mono { font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: .86rem; }
+.ov-notes { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 22px; }
+.ov-notes h4 { font-size: .92rem; margin-bottom: 8px; display: flex; align-items: center; gap: .5em; }
+.ov-notes h4 svg { color: var(--primary); }
+.ov-notes p { font-size: .92rem; color: var(--ink-2); line-height: 1.55; }
+.ov-notes .usta { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line-soft); }
+.ov-notes .usta .ava { width: 38px; height: 38px; border-radius: 50%; background: color-mix(in srgb, var(--primary) 16%, var(--surface)); color: var(--primary-deep); display: grid; place-items: center; font-weight: 700; font-family: var(--font-display); }
+.ov-notes .usta .un { font-size: .9rem; font-weight: 600; }
+.ov-notes .usta .ur { font-size: .78rem; color: var(--ink-2); }
+
+.ov-approve { background: color-mix(in srgb, var(--primary) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--line)); border-radius: var(--radius); padding: 20px 22px; }
+.ov-approve p { font-size: .9rem; color: var(--ink-2); margin-bottom: 14px; }
+.ov-approve .row { display: flex; gap: 12px; flex-wrap: wrap; }
+.ov-approve .btn-primary { flex: 1; justify-content: center; min-width: 180px; }
+
+/* onaylandı durumu */
+.ov-approved { display: none; text-align: center; padding: 14px 0 6px; }
+.ov-approved.show { display: block; animation: fadeUp .4s var(--ease); }
+.ov-approved .seal { width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 50%; background: color-mix(in srgb, var(--primary) 14%, var(--surface)); border: 1.5px solid var(--primary); display: grid; place-items: center; color: var(--primary-deep); animation: pop .5s var(--ease); }
+.ov-approved h3 { font-family: var(--font-display); font-weight: var(--display-weight); font-size: 1.4rem; margin-bottom: 6px; }
+.ov-approved p { color: var(--ink-2); font-size: .92rem; }
+.ov-approve.hide { display: none; }
+
+@media (max-width: 900px) {
+  .panel-grid { grid-template-columns: 1fr; }
+  .approve-card { grid-template-columns: 1fr; }
+  .approve-card .ba { min-height: 240px; }
+}
+@media (max-width: 540px) {
+  .care-row { grid-template-columns: 52px 1fr; }
+  .care-row .cr-side { grid-column: 2; align-items: flex-start; text-align: left; flex-direction: row; gap: 10px; }
+  .ov-meta { grid-template-columns: 1fr; }
+}

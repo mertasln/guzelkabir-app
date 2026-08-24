@@ -1,0 +1,125 @@
+/* ===========================================================
+   GüzelKabir — Yön sistemleri (A · B · C)
+   Düşük doygunluk, sıcak, zeytin-yeşili ağırlıklı.
+   Yön, <html data-theme="a|b|c"> ile değişir.
+   =========================================================== */
+
+:root {
+  --maxw: 1180px;
+  --gutter: clamp(20px, 5vw, 64px);
+  --r-pill: 999px;
+  --ease: cubic-bezier(.22, .61, .36, 1);
+}
+
+/* ---------- A · Bahçe : krem kâğıt + zeytin, sıcak & edebi ---------- */
+[data-theme="a"] {
+  --bg:        #F4EFE3;
+  --bg-2:      #ECE4D2;
+  --surface:   #FBF8F0;
+  --ink:       #2B2A23;
+  --ink-2:     #6F6A58;
+  --ink-3:     #908A75;
+  --line:      #DCD3BF;
+  --line-soft: #E6DECC;
+  --primary:   #56673F;
+  --primary-deep: #3E4B2C;
+  --accent:    #8A9A6B;
+  --on-primary:#F6F2E5;
+
+  --radius:    14px;
+  --radius-sm: 10px;
+  --font-display: "Spectral", Georgia, serif;
+  --font-body:    "Source Sans 3", system-ui, sans-serif;
+  --display-weight: 600;
+  --display-italic: 1;
+  --h-tracking: -0.01em;
+  --eyebrow-tracking: 0.18em;
+  --paper: 1;   /* kâğıt dokusu açık */
+}
+
+/* ---------- B · Hat & Geometri : fildişi + orman yeşili + pirinç ---------- */
+[data-theme="b"] {
+  --bg:        #F1ECE0;
+  --bg-2:      #E7DECC;
+  --surface:   #F8F3E8;
+  --ink:       #20201B;
+  --ink-2:     #5C5645;
+  --ink-3:     #837C66;
+  --line:      #CFC3A9;
+  --line-soft: #DDD2B9;
+  --primary:   #39482F;
+  --primary-deep: #28341F;
+  --accent:    #A6884F;       /* pirinç — yalnız ince çizgi/ornament */
+  --on-primary:#F4EEDD;
+
+  --radius:    3px;
+  --radius-sm: 2px;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-body:    "IBM Plex Sans", system-ui, sans-serif;
+  --display-weight: 600;
+  --display-italic: 0;
+  --h-tracking: 0.005em;
+  --eyebrow-tracking: 0.32em;
+  --paper: 0;
+}
+
+/* ---------- C · Modern Sakin : ferah beyaz + büyük serif display ---------- */
+[data-theme="c"] {
+  --bg:        #FAF7F0;
+  --bg-2:      #F1ECDF;
+  --surface:   #FFFFFF;
+  --ink:       #1E231C;
+  --ink-2:     #6A7062;
+  --ink-3:     #9AA08F;
+  --line:      #E5DECC;
+  --line-soft: #EFE9DA;
+  --primary:   #53684A;
+  --primary-deep: #3C4D35;
+  --accent:    #7E8C66;
+  --on-primary:#F7F4EC;
+
+  --radius:    8px;
+  --radius-sm: 6px;
+  --font-display: "Newsreader", Georgia, serif;
+  --font-body:    "Hanken Grotesk", system-ui, sans-serif;
+  --display-weight: 500;
+  --display-italic: 0;
+  --h-tracking: -0.018em;
+  --eyebrow-tracking: 0.22em;
+  --paper: 0;
+}
+
+/* ===========================================================
+   Yöne özgü dekor görünürlüğü
+   (tüm dekor ögeleri DOM'da; CSS ile açılır/kapanır)
+   =========================================================== */
+.dec { display: none; }                 /* varsayılan gizli */
+[data-theme="a"] .dec-a { display: block; }
+[data-theme="b"] .dec-b { display: block; }
+[data-theme="c"] .dec-c { display: block; }
+[data-theme="b"] .dec-b.inline { display: inline-block; }
+
+/* Kâğıt dokusu yalnız A'da */
+[data-theme="a"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .5;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(120,110,80,.05) 0 1px, transparent 1px),
+    radial-gradient(circle at 70% 60%, rgba(120,110,80,.045) 0 1px, transparent 1px);
+  background-size: 7px 7px, 9px 9px;
+}
+
+/* Hero hizalama yöne göre */
+[data-theme="b"] .hero-inner { text-align: center; }
+[data-theme="b"] .hero-copy  { margin-inline: auto; }
+[data-theme="b"] .hero-actions { justify-content: center; }
+[data-theme="b"] .hero-trust { justify-content: center; }
+[data-theme="b"] .hero-grid { grid-template-columns: 1fr; }
+[data-theme="b"] .hero-figure { max-width: 760px; margin-inline: auto; }
+
+/* Eyebrow / başlık tonları */
+[data-theme="a"] .display em { font-style: italic; }

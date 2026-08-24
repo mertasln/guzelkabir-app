@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="c">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GüzelKabir — Panelim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/themes.css" />
+<link rel="stylesheet" href="assets/base.css" />
+<link rel="stylesheet" href="assets/panel.css" />
+</head>
+<body class="panel" data-screen-label="Müşteri Paneli">
+
+<!-- ÜST BAR -->
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a href="GüzelKabir — Ana Sayfa.html" class="brand" aria-label="GüzelKabir">
+      <span class="mark" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+          <path d="M15 3.5c3.2 0 5.4 2.4 5.4 5.7 0 4.3-5.4 9.3-5.4 9.3S9.6 13.5 9.6 9.2C9.6 5.9 11.8 3.5 15 3.5Z" stroke="currentColor" stroke-width="1.4"/>
+          <circle cx="15" cy="9.1" r="2" fill="currentColor"/>
+          <path d="M6 25.5h18M9.5 25.5v-3.2M20.5 25.5v-3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </span>
+      GüzelKabir
+    </a>
+    <nav class="nav">
+      <a href="#" style="color:var(--ink)">Panelim</a>
+      <a href="GüzelKabir — Sipariş Akışı.html">Yeni bakım</a>
+    </nav>
+    <div class="topbar-actions">
+      <div class="cur-toggle" role="group" aria-label="Para birimi">
+        <button data-cur="try" class="active">₺ TRY</button>
+        <button data-cur="eur">€ EUR</button>
+      </div>
+      <span class="brand" style="font-size:1rem;gap:.5em">
+        <span style="width:34px;height:34px;border-radius:50%;background:color-mix(in srgb,var(--primary) 16%,var(--surface));color:var(--primary-deep);display:grid;place-items:center;font-weight:700;font-family:var(--font-display)">M</span>
+        <span style="font-family:var(--font-body);font-size:.92rem">Murat Y.</span>
+      </span>
+    </div>
+  </div>
+</header>
+
+<div class="panel-wrap">
+  <!-- SELAM -->
+  <div class="greet">
+    <div>
+      <h1>Merhaba, Murat.</h1>
+      <p class="gsub">Babanız Mehmet Yılmaz'ın kabri · Karacaahmet</p>
+    </div>
+    <span class="gstat" id="gstat"><span class="pulse"></span> 1 bakım onayınızı bekliyor</span>
+  </div>
+
+  <div class="panel-grid">
+    <!-- ===================== SOL ===================== -->
+    <div class="panel-main">
+
+      <!-- ONAY BEKLEYEN -->
+      <div class="block" id="approve-section">
+        <div class="block-head"><h2>Onayınızı bekliyor</h2></div>
+        <div class="approve-card">
+          <div class="ba" style="--pos:48%">
+            <div class="ba-layer ba-after"></div>
+            <div class="ba-layer ba-before"></div>
+            <span class="ba-tag l mono">ÖNCE</span>
+            <span class="ba-tag r mono">SONRA</span>
+            <div class="ba-handle"><span class="grip" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7 5L4 9l3 4M11 5l3 4-3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+          </div>
+          <div class="ac-body">
+            <span class="ac-badge"><span style="width:7px;height:7px;border-radius:50%;background:currentColor"></span> Yeni rapor</span>
+            <h3>Mayıs ayı bakımı tamamlandı</h3>
+            <div class="ac-meta">
+              <span><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5c2.6 0 4.4 2 4.4 4.6 0 3.4-4.4 6.9-4.4 6.9S3.6 9.5 3.6 6.1C3.6 3.5 5.4 1.5 8 1.5Z" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="6" r="1.5" fill="currentColor"/></svg> Karacaahmet · Ada 14 / Parsel 207</span>
+              <span><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.2"/><path d="M8 4.6v4l2.6 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg> 29 May 2026 · 11:42</span>
+            </div>
+            <p style="font-size:.9rem;color:var(--ink-2);margin-bottom:16px;line-height:1.5">Fotoğraflar sahada canlı çekildi ve GPS konumu parsel ile eşleşti. İnceleyip onaylayabilirsiniz.</p>
+            <div class="ac-actions">
+              <button class="btn btn-primary" data-detail
+                data-cem="Mayıs ayı bakımı" data-loc="Karacaahmet · Ada 14 / Parsel 207"
+                data-coord="41.0012° N · 29.0361° E" data-when="29 May 2026 · 11:42"
+                data-deceased="Mehmet Yılmaz" data-usta="Hasan Kaya"
+                data-note="Mermer ve taş yüzeyi temizlendi, yabani otlar alındı, toprak havalandırıldı ve sulama yapıldı. Mezar taşı yazısı okunaklı; çatlak veya hasar görülmedi."
+                data-status="wait">İncele ve onayla <span class="arr">→</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AKTİF BAKIMLAR -->
+      <div class="block">
+        <div class="block-head"><h2>Aktif bakımlar</h2><span class="count">Aylık abonelik</span></div>
+        <div class="care-list">
+          <div class="care-row" data-detail
+            data-cem="Haziran ayı bakımı" data-loc="Karacaahmet · Ada 14 / Parsel 207"
+            data-coord="41.0012° N · 29.0361° E" data-when="Planlandı · 12 Haz 2026"
+            data-deceased="Mehmet Yılmaz" data-usta="Hasan Kaya"
+            data-note="Bu bakım henüz yapılmadı. Planlanan tarihte usta sahaya gidip canlı önce/sonra fotoğrafı çekecek."
+            data-status="scheduled">
+            <div class="ph thumb" data-label=""></div>
+            <div class="cr-main"><h4>Haziran ayı bakımı</h4><p>Karacaahmet · Aylık abonelik</p></div>
+            <div class="cr-side"><span class="cr-date">12 Haz 2026</span><span class="pill scheduled">Planlandı</span></div>
+          </div>
+          <div class="care-row" data-detail
+            data-cem="Bayram öncesi özel bakım" data-loc="Karacaahmet · Ada 14 / Parsel 207"
+            data-coord="41.0012° N · 29.0361° E" data-when="Planlandı · Kurban Bayramı öncesi"
+            data-deceased="Mehmet Yılmaz" data-usta="Hasan Kaya"
+            data-note="Aylık aboneliğinize dahil bayram önceliği. Bayramdan önce ek temizlik ve düzenleme yapılacak."
+            data-status="scheduled">
+            <div class="ph thumb" data-label=""></div>
+            <div class="cr-main"><h4>Bayram öncesi özel bakım</h4><p>Karacaahmet · Bayram önceliği</p></div>
+            <div class="cr-side"><span class="cr-date">~ 5 Haz 2026</span><span class="pill scheduled">Planlandı</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GEÇMİŞ BAKIMLAR -->
+      <div class="block">
+        <div class="block-head"><h2>Geçmiş bakımlar</h2><span class="count" id="hist-count">3 kayıt</span></div>
+        <div class="care-list">
+          <div class="care-row" data-detail
+            data-cem="Nisan ayı bakımı" data-loc="Karacaahmet · Ada 14 / Parsel 207"
+            data-coord="41.0012° N · 29.0361° E" data-when="28 Nis 2026 · 10:15"
+            data-deceased="Mehmet Yılmaz" data-usta="Hasan Kaya"
+            data-note="Mermer temizliği, yabani ot alımı ve sulama yapıldı. Bahar yağmurları sonrası toprak düzenlendi."
+            data-status="done">
+            <div class="ph thumb" data-label=""></div>
+            <div class="cr-main"><h4>Nisan ayı bakımı</h4><p>Karacaahmet · Onaylandı</p></div>
+            <div class="cr-side"><span class="cr-date">28 Nis 2026</span><span class="pill done">✓ Onaylı</span></div>
+          </div>
+          <div class="care-row" data-detail
+            data-cem="Mart ayı bakımı" data-loc="Karacaahmet · Ada 14 / Parsel 207"
+            data-coord="41.0012° N · 29.0361° E" data-when="26 Mar 2026 · 14:03"
+            data-deceased="Mehmet Yılmaz" data-usta="Hasan Kaya"
+            data-note="Kış sonrası ilk kapsamlı bakım. Taş yüzeyi temizlendi, çevre düzenlendi."
+            data-status="done">
+            <div class="ph thumb" data-label=""></div>
+            <div class="cr-main"><h4>Mart ayı bakımı</h4><p>Karacaahmet · Onaylandı</p></div>
+            <div class="cr-side"><span class="cr-date">26 Mar 2026</span><span class="pill done">✓ Onaylı</span></div>
+          </div>
+          <div class="care-row" data-detail
+            data-cem="İlk bakım" data-loc="Karacaahmet · Ada 14 / Parsel 207"
+            data-coord="41.0012° N · 29.0361° E" data-when="24 Şub 2026 · 11:30"
+            data-deceased="Mehmet Yılmaz" data-usta="Hasan Kaya"
+            data-note="İlk tespit ve kapsamlı temizlik. Mezar konumu doğrulandı ve fotoğraflandı."
+            data-status="done">
+            <div class="ph thumb" data-label=""></div>
+            <div class="cr-main"><h4>İlk bakım</h4><p>Karacaahmet · Onaylandı</p></div>
+            <div class="cr-side"><span class="cr-date">24 Şub 2026</span><span class="pill done">✓ Onaylı</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== SAĞ ===================== -->
+    <aside>
+      <!-- ABONELİK -->
+      <div class="aside-card">
+        <h3>Aboneliğiniz</h3>
+        <span class="plan-tag"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l4.5 1.7v3.6c0 2.9-1.9 5.4-4.5 6.2-2.6-.8-4.5-3.3-4.5-6.2V3.2L8 1.5Z" stroke="currentColor" stroke-width="1.2"/></svg> Aylık Abonelik</span>
+        <div class="sub-line"><span class="k">Tutar</span><span class="v"><span data-try="₺1.200" data-eur="€35">₺1.200</span> / ay</span></div>
+        <div class="sub-line"><span class="k">Sonraki yenileme</span><span class="v">12 Haz 2026</span></div>
+        <div class="sub-line"><span class="k">Ödeme yöntemi</span><span class="v">•••• 4417</span></div>
+        <div class="sub-actions">
+          <button class="btn btn-quiet" id="btn-pause">Duraklat</button>
+          <button class="btn btn-danger" id="btn-cancel">İptal et</button>
+        </div>
+        <div class="sub-state" id="sub-state"></div>
+      </div>
+
+      <!-- HATIRLATMA -->
+      <div class="aside-card memory">
+        <div class="anniv">
+          <span class="ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2.5" y="3.5" width="13" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M2.5 6.5h13M6 1.8v3M12 1.8v3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span>
+          <span><b style="display:block;color:var(--ink);font-weight:700;margin-bottom:3px">Yıldönümü yaklaşıyor</b>Babanız Mehmet Yılmaz'ın vefat yıldönümü 18 Temmuz. O hafta için özel bir bakım planlamamızı ister misiniz?</span>
+        </div>
+        <a href="GüzelKabir — Sipariş Akışı.html" class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:16px;font-size:.9rem">Özel bakım planla</a>
+      </div>
+
+      <!-- GÜVEN MİNİ -->
+      <div class="aside-card">
+        <h3 style="font-size:1.05rem;margin-bottom:14px">Her bakımda</h3>
+        <div class="trust-mini" style="margin-top:0">
+          <div class="tm"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="4.5" width="11" height="8.5" rx="1.2" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="8.7" r="2.1" stroke="currentColor" stroke-width="1.2"/></svg> Sahada canlı çekim, galeri kapalı</div>
+          <div class="tm"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1.5c2.6 0 4.4 2 4.4 4.6 0 3.4-4.4 6.9-4.4 6.9S3.6 9.5 3.6 6.1C3.6 3.5 5.4 1.5 8 1.5Z" stroke="currentColor" stroke-width="1.2"/></svg> GPS, parsel ile eşleşir</div>
+          <div class="tm"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.2"/><path d="M8 4.6v4l2.6 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg> Değiştirilemez zaman damgası</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ===================== DETAY OVERLAY ===================== -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true">
+  <div class="overlay-bg"></div>
+  <div class="overlay-panel">
+    <div class="ov-head">
+      <h2 id="ov-title">Bakım detayı</h2>
+      <button class="ov-close" aria-label="Kapat"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+    </div>
+    <div class="ov-body">
+      <div class="ba" style="--pos:50%">
+        <div class="ba-layer ba-after"></div>
+        <div class="ba-layer ba-before"></div>
+        <span class="ba-tag l mono">ÖNCE</span>
+        <span class="ba-tag r mono">SONRA</span>
+        <div class="ba-stamp">
+          <span class="gps" aria-hidden="true"><svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M7 1.5c2.5 0 4.2 1.9 4.2 4.4 0 3.3-4.2 6.6-4.2 6.6S2.8 9.2 2.8 5.9C2.8 3.4 4.5 1.5 7 1.5Z" stroke="currentColor" stroke-width="1.2"/><circle cx="7" cy="5.8" r="1.4" fill="currentColor"/></svg></span>
+          <span>Konum doğrulandı<br /><span class="mono" id="ov-coord">41.0012° N · 29.0361° E</span></span>
+        </div>
+        <div class="ba-handle"><span class="grip" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7 5L4 9l3 4M11 5l3 4-3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+      </div>
+
+      <div class="ov-meta">
+        <div class="m"><div class="lbl">Konum</div><div class="val" id="ov-loc">—</div></div>
+        <div class="m"><div class="lbl">Tarih &amp; saat</div><div class="val mono" id="ov-when">—</div></div>
+        <div class="m"><div class="lbl">Merhum</div><div class="val" id="ov-deceased">—</div></div>
+        <div class="m"><div class="lbl">GPS koordinatı</div><div class="val mono" id="ov-coord2"><span style="color:var(--primary)">●</span> Eşleşti</div></div>
+      </div>
+
+      <div class="ov-notes">
+        <h4><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2.5h10v11l-2-1.5-2 1.5-2-1.5-2 1.5v-11Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M5.5 5.5h5M5.5 8h3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg> Usta notu</h4>
+        <p id="ov-note-text">—</p>
+        <div class="usta">
+          <span class="ava" id="ov-usta-avatar">H</span>
+          <span><span class="un" id="ov-usta">Hasan Kaya</span><br /><span class="ur">Onaylı usta · Karacaahmet</span></span>
+        </div>
+      </div>
+
+      <div class="ov-approve">
+        <p>Fotoğrafları incelediniz. İşi onaylarsanız ödeme ustaya aktarılır. Memnun kalmazsanız ek ücret olmadan yeniden yapılır.</p>
+        <div class="row">
+          <button class="btn btn-primary" id="btn-approve">✓ Onayla, ödemeyi aktar</button>
+          <button class="btn btn-ghost" id="btn-redo">Eksik var, yeniden yapılsın</button>
+        </div>
+      </div>
+
+      <div class="ov-approved">
+        <div class="seal" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 34 34" fill="none"><path d="M9 17.5l5 5L25 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Onaylandı, teşekkürler</h3>
+        <p>Ödeme ustaya aktarıldı. Bu kayıt geçmiş bakımlarınıza eklendi.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/panel.js"></script>
+</body>
+</html>

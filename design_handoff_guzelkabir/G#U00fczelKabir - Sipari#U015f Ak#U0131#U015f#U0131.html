@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="c">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GüzelKabir — Kabir Bakımı Başlat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/themes.css" />
+<link rel="stylesheet" href="assets/base.css" />
+<link rel="stylesheet" href="assets/wizard.css" />
+</head>
+<body class="flow" data-screen-label="Sipariş Akışı">
+
+<!-- ÜST BAR -->
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a href="GüzelKabir — Ana Sayfa.html" class="brand" aria-label="GüzelKabir ana sayfa">
+      <span class="mark" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+          <path d="M15 3.5c3.2 0 5.4 2.4 5.4 5.7 0 4.3-5.4 9.3-5.4 9.3S9.6 13.5 9.6 9.2C9.6 5.9 11.8 3.5 15 3.5Z" stroke="currentColor" stroke-width="1.4"/>
+          <circle cx="15" cy="9.1" r="2" fill="currentColor"/>
+          <path d="M6 25.5h18M9.5 25.5v-3.2M20.5 25.5v-3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </span>
+      GüzelKabir
+    </a>
+    <div class="topbar-actions">
+      <div class="cur-toggle" role="group" aria-label="Para birimi">
+        <button data-cur="try" class="active">₺ TRY</button>
+        <button data-cur="eur">€ EUR</button>
+      </div>
+      <a href="GüzelKabir — Ana Sayfa.html" class="btn btn-ghost nav-cta">← Ana sayfa</a>
+    </div>
+  </div>
+</header>
+
+<div class="flow-shell">
+  <!-- ===================== SOL: AKIŞ ===================== -->
+  <div class="flow-main">
+    <!-- adım göstergesi -->
+    <div class="stepper">
+      <div class="node active"><span class="dot">1</span><span class="nlabel">Konum</span></div>
+      <div class="bar"></div>
+      <div class="node"><span class="dot">2</span><span class="nlabel">Paket</span></div>
+      <div class="bar"></div>
+      <div class="node"><span class="dot">3</span><span class="nlabel">Merhum</span></div>
+      <div class="bar"></div>
+      <div class="node"><span class="dot">4</span><span class="nlabel">Ödeme</span></div>
+      <div class="bar"></div>
+      <div class="node"><span class="dot">5</span><span class="nlabel">Onay</span></div>
+    </div>
+
+    <!-- ADIM 1 · KONUM -->
+    <section class="step-panel active">
+      <div class="step-h">
+        <span class="skicker">Adım 1 / 5</span>
+        <h1>Kabir nerede?</h1>
+        <p>Mezarlığı seçin ve ada/parsel bilgisini girin. Bilmiyorsanız, sizin için tespit ederiz.</p>
+      </div>
+
+      <div class="flow-fieldset">
+        <div class="row2">
+          <div class="field">
+            <label for="il">İl</label>
+            <select class="select" id="il" disabled>
+              <option>İstanbul</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ilce">İlçe</label>
+            <select class="select" id="ilce">
+              <option value="">Seçiniz</option>
+              <option>Şişli</option>
+              <option>Üsküdar</option>
+              <option>Eyüpsultan</option>
+              <option>Fatih</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Mezarlık</label>
+          <div class="cem-pick">
+            <label><input type="radio" name="cemetery" value="Zincirlikuyu" /><span class="cem-card"><span class="cname">Zincirlikuyu</span><span class="crole">Premium itina</span></span></label>
+            <label><input type="radio" name="cemetery" value="Karacaahmet" /><span class="cem-card"><span class="cname">Karacaahmet</span><span class="crole">Büyük ölçek · diaspora</span></span></label>
+            <label><input type="radio" name="cemetery" value="Edirnekapı" /><span class="cem-card"><span class="cname">Edirnekapı</span><span class="crole">Manevi miras</span></span></label>
+            <label><input type="radio" name="cemetery" value="Eyüpsultan" /><span class="cem-card"><span class="cname">Eyüpsultan</span><span class="crole">Yüksek manevi trafik</span></span></label>
+          </div>
+          <div class="err" id="cem-err">Lütfen bir mezarlık seçin.</div>
+        </div>
+
+        <div class="req-fields">
+          <div class="row2">
+            <div class="field">
+              <label for="ada">Ada</label>
+              <input class="input" id="ada" placeholder="Örn. 14" />
+              <div class="err">Ada bilgisini girin.</div>
+            </div>
+            <div class="field">
+              <label for="parsel">Parsel</label>
+              <input class="input" id="parsel" placeholder="Örn. 207" />
+              <div class="err">Parsel bilgisini girin.</div>
+            </div>
+          </div>
+        </div>
+
+        <label class="help-toggle" for="help-needed">
+          <input type="checkbox" id="help-needed" />
+          <span class="ht-txt"><b>Ada/parsel bilmiyorum — yardım isteyin</b><span>Mezarlık adı ve merhum bilgisiyle ekibimiz yeri harita ve saha tespitiyle bulur.</span></span>
+        </label>
+
+        <div class="help-fields" id="help-fields">
+          <div class="field" style="margin-top:16px">
+            <label for="help-note">Bildiğiniz detaylar <span class="hint">(opsiyonel)</span></label>
+            <textarea class="input" id="help-note" rows="2" placeholder="Örn. ana girişten girince sağda, çınar ağacının yanında..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-nav">
+        <a href="GüzelKabir — Ana Sayfa.html" class="back">← Vazgeç</a>
+        <button class="btn btn-primary btn-next" data-next>Devam et <span class="arr">→</span></button>
+      </div>
+    </section>
+
+    <!-- ADIM 2 · PAKET -->
+    <section class="step-panel">
+      <div class="step-h">
+        <span class="skicker">Adım 2 / 5</span>
+        <h1>Bakım paketini seçin.</h1>
+        <p>Üst bardan ₺ / € geçişi yapabilirsiniz. Abonelik tek tıkla iptal edilir.</p>
+      </div>
+
+      <div class="plan-pick">
+        <label>
+          <input type="radio" name="plan" value="tek" />
+          <span class="ppick" data-plan="tek">
+            <span class="chk"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.2l2.6 2.6L10 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="pn">Tek Seferlik</span>
+            <span class="pp"><span class="a">₺850</span></span>
+            <span class="pd">Bir kerelik özenli bakım. Tanışmak için ideal.</span>
+          </span>
+        </label>
+        <label>
+          <input type="radio" name="plan" value="aylik" checked />
+          <span class="ppick" data-plan="aylik">
+            <span class="tag">Öne çıkan</span>
+            <span class="chk"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.2l2.6 2.6L10 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="pn">Aylık Abonelik</span>
+            <span class="pp"><span class="a">₺1.200</span><span class="u">/ ay</span></span>
+            <span class="pd">Yıl boyu bakımlı kalır. Haftalık sulama, bayramda öncelik.</span>
+          </span>
+        </label>
+        <label>
+          <input type="radio" name="plan" value="yillik" />
+          <span class="ppick" data-plan="yillik">
+            <span class="chk"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.2l2.6 2.6L10 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="pn">Yıllık Premium</span>
+            <span class="pp"><span class="a">₺9.500</span><span class="u">/ yıl</span></span>
+            <span class="pd">En kapsamlı itina. Onarım, yazı boyama ve çiçek dahil.</span>
+          </span>
+        </label>
+      </div>
+
+      <label class="addon" for="flower">
+        <input type="checkbox" id="flower" />
+        <span class="a-txt"><b>Mevsimlik çiçek ekle</b> — isteğe bağlı, edebe uygun düzenleme</span>
+        <span class="a-price">+ ₺250</span>
+      </label>
+
+      <div class="flow-nav">
+        <button class="back" data-back>← Geri</button>
+        <button class="btn btn-primary btn-next" data-next>Devam et <span class="arr">→</span></button>
+      </div>
+    </section>
+
+    <!-- ADIM 3 · MERHUM -->
+    <section class="step-panel">
+      <div class="step-h">
+        <span class="skicker">Adım 3 / 5</span>
+        <h1>Merhum bilgileri.</h1>
+        <p>Vefat tarihini girmeniz, her yıl yıldönümünde size nazikçe hatırlatma yapmamızı sağlar.</p>
+      </div>
+
+      <div class="field">
+        <label for="deceased">Ad Soyad</label>
+        <input class="input" id="deceased" placeholder="Merhumun adı soyadı" />
+        <div class="err">Lütfen ad soyad girin.</div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label for="death-date">Vefat tarihi</label>
+          <input class="input" id="death-date" type="date" />
+          <div class="err">Lütfen vefat tarihini girin.</div>
+        </div>
+        <div class="field">
+          <label for="relation">Yakınlık <span class="hint">(opsiyonel)</span></label>
+          <select class="select" id="relation">
+            <option value="">Seçiniz</option>
+            <option>Baba</option><option>Anne</option><option>Dede</option><option>Nine</option>
+            <option>Eş</option><option>Kardeş</option><option>Diğer</option>
+          </select>
+        </div>
+      </div>
+      <label class="addon" for="anniv" style="margin-top:4px">
+        <input type="checkbox" id="anniv" checked />
+        <span class="a-txt"><b>Yıldönümü hatırlatması</b> — vefat yıldönümü ve bayram öncesi nazik bildirim</span>
+      </label>
+
+      <div class="flow-nav">
+        <button class="back" data-back>← Geri</button>
+        <button class="btn btn-primary btn-next" data-next>Devam et <span class="arr">→</span></button>
+      </div>
+    </section>
+
+    <!-- ADIM 4 · ÖDEME -->
+    <section class="step-panel">
+      <div class="step-h">
+        <span class="skicker">Adım 4 / 5</span>
+        <h1>Özet ve ödeme.</h1>
+        <p>Kart bilgileriniz yalnızca ödeme sağlayıcısına iletilir. Ücret, işi onaylamadan tahsil edilmez.</p>
+      </div>
+
+      <div class="seg" role="group" aria-label="Ödeme yöntemi">
+        <button class="active">Kredi / Banka kartı</button>
+        <button>SEPA / Havale</button>
+      </div>
+
+      <div class="card-visual">
+        <div class="field">
+          <label for="card-name">Kart üzerindeki ad</label>
+          <input class="input" id="card-name" placeholder="Ad Soyad" autocomplete="cc-name" />
+          <div class="err">Bu alan gerekli.</div>
+        </div>
+        <div class="field">
+          <label for="card-no">Kart numarası</label>
+          <input class="input" id="card-no" placeholder="0000 0000 0000 0000" inputmode="numeric" autocomplete="cc-number" />
+          <div class="err">Bu alan gerekli.</div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="card-exp">Son kullanma</label>
+            <input class="input" id="card-exp" placeholder="AA / YY" autocomplete="cc-exp" />
+            <div class="err">Gerekli.</div>
+          </div>
+          <div class="field">
+            <label for="card-cvc">CVC</label>
+            <input class="input" id="card-cvc" placeholder="123" inputmode="numeric" autocomplete="cc-csc" />
+            <div class="err">Gerekli.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sum-note" style="margin-top:18px">
+        <span class="ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M9 2l5.5 2v4c0 3.3-2.2 6.2-5.5 7-3.3-.8-5.5-3.7-5.5-7V4L9 2Z" stroke="currentColor" stroke-width="1.3"/><path d="M6.6 8.8l1.6 1.6L11.6 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span>Bu bir prototip ekranıdır; gerçek bir ödeme alınmaz. Yayında ücret yalnızca siz işi onayladıktan sonra ustaya aktarılır.</span>
+      </div>
+
+      <div class="flow-nav">
+        <button class="back" data-back>← Geri</button>
+        <button class="btn btn-primary btn-next" data-next>Siparişi tamamla <span class="arr">→</span></button>
+      </div>
+    </section>
+
+    <!-- ADIM 5 · ONAY -->
+    <section class="step-panel">
+      <div class="confirm">
+        <div class="seal" aria-hidden="true">
+          <svg width="34" height="34" viewBox="0 0 34 34" fill="none"><path d="M9 17.5l5 5L25 11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h1>Talebiniz alındı.</h1>
+        <p><span id="confirm-cem">Karacaahmet</span> için <b id="confirm-plan">Aylık Abonelik</b> bakım talebiniz oluşturuldu.</p>
+        <p>Onaylı ustamız atandığında ve ilk fotoğraflar hazır olduğunda panelinizden haberdar olacaksınız.</p>
+
+        <div class="next">
+          <h3>Bundan sonra ne olacak?</h3>
+          <div class="nstep"><span class="ni">1</span> O mezarlıktan sorumlu onaylı usta talebinizi üstlenir (genellikle 48 saat içinde).</div>
+          <div class="nstep"><span class="ni">2</span> Usta sahada canlı önce/sonra fotoğrafı çeker; GPS ve zaman damgalı olarak panelinize düşer.</div>
+          <div class="nstep"><span class="ni">3</span> Siz onaylarsınız — ancak o zaman ödeme ustaya aktarılır.</div>
+        </div>
+
+        <div class="flow-nav" style="border:none;justify-content:center;margin-top:28px">
+          <a href="GüzelKabir — Ana Sayfa.html" class="btn btn-ghost">Ana sayfaya dön</a>
+          <a href="GüzelKabir — Müşteri Paneli.html" class="btn btn-primary">Panele git →</a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===================== SAĞ: ÖZET ===================== -->
+  <aside class="summary">
+    <div class="summary-card">
+      <div class="ph" data-label="foto: mevcut kabir"></div>
+      <div class="summary-body">
+        <h3>Sipariş özeti</h3>
+        <p class="sub">İstanbul · Uzaktan kabir bakımı</p>
+        <div class="sum-row"><span class="k">Mezarlık</span><span class="v empty" id="sum-cem">—</span></div>
+        <div class="sum-row"><span class="k">Konum</span><span class="v empty" id="sum-loc">—</span></div>
+        <div class="sum-row"><span class="k">Merhum</span><span class="v empty" id="sum-dec">—</span></div>
+        <div class="sum-row"><span class="k">Paket <span class="muted" id="sum-plan-unit" style="font-weight:400"></span></span><span class="v" id="sum-plan">Aylık Abonelik</span></div>
+        <div class="sum-row" id="sum-flower-row" style="display:none"><span class="k">Mevsimlik çiçek</span><span class="v">+ ₺250</span></div>
+        <div class="sum-total"><span class="k">Toplam</span><span class="v" id="sum-total">₺1.200</span></div>
+        <div class="sum-note">
+          <span class="ic" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.2"/><path d="M8 4.6v4l2.6 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span>
+          <span>Önce işi onaylar, sonra ödersiniz. Onay vermeden ücret tahsil edilmez.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="trust-mini">
+      <div class="tm"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l4.5 1.7v3.6c0 2.9-1.9 5.4-4.5 6.2-2.6-.8-4.5-3.3-4.5-6.2V3.2L8 1.5Z" stroke="currentColor" stroke-width="1.2"/></svg> Onaylı, faturalı yerel ustalar</div>
+      <div class="tm"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="4.5" width="11" height="8.5" rx="1.2" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="8.7" r="2.1" stroke="currentColor" stroke-width="1.2"/></svg> GPS &amp; zaman damgalı kanıt</div>
+      <div class="tm"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2.5 8.5l3 3 8-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Memnun kalmazsanız yeniden yapılır</div>
+    </div>
+  </aside>
+</div>
+
+<script src="assets/wizard.js"></script>
+</body>
+</html>
