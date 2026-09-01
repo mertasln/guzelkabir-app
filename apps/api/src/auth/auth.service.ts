@@ -73,6 +73,16 @@ export class AuthService {
       throw new UnauthorizedException('E-posta veya şifre hatalı.');
     }
 
+    // Admin Panel ADIM 9 Phase 7 (Kullanıcı & Rol Yönetimi) ile bulunan gerçek
+    // boşluk: deletedAt (soft-delete) alanı User modelinde spec §4'ten beri
+    // vardı ama login() bunu HİÇ kontrol etmiyordu — bir hesabı "devre dışı
+    // bırakma" özelliği eklenmeden önce bu görünmez kalmıştı (hiçbir kod yolu
+    // deletedAt'i yazmıyordu). Şimdi bir ops/support/admin hesabını devre dışı
+    // bırakmak GERÇEKTEN giriş engelliyor, kozmetik bir durum değil.
+    if (user.deletedAt) {
+      throw new UnauthorizedException('Bu hesap devre dışı bırakılmış.');
+    }
+
     return this.issueTokenPair(user.id, user.role);
   }
 
@@ -106,7 +116,10 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
-    if (!user) {
+    if (!user || user.deletedAt) {
+      // deletedAt kontrolü: bkz. login() yorumu — bir hesap devre dışı
+      // bırakıldıktan sonra hâlâ geçerli bir refresh token'ı varsa (7 güne
+      // kadar), bu olmadan oturumunu süresiz uzatabilirdi.
       await this.redis.del(currentJtiKey);
       throw new UnauthorizedException(
         'Refresh token geçersiz veya süresi dolmuş.',

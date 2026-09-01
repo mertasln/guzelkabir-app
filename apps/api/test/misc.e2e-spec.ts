@@ -24,6 +24,8 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
   let partnerUserId: string;
   let graveLocationId: string;
   let cemetery2Id: string;
+  let adminUserId: string;
+  let custIdForStaffTest: string;
 
   beforeAll(async () => {
     const ctx = await createTestApp();
@@ -62,6 +64,7 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
         locale: 'tr',
       },
     });
+    custIdForStaffTest = customer.id;
     const admin = await prisma.user.create({
       data: {
         email: 'misc-admin@test.com',
@@ -71,6 +74,7 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
         locale: 'tr',
       },
     });
+    adminUserId = admin.id;
     const partnerUser = await prisma.user.create({
       data: {
         email: 'misc-partner@test.com',
@@ -408,6 +412,150 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
         .get('/api/v1/partners/00000000-0000-0000-0000-000000000000/payouts')
         .set('Authorization', `Bearer ${adminToken}`);
       expect(missing.status).toBe(404);
+    });
+  });
+
+  // Admin Panel, ADIM 9 Phase 7: spec §11.1 "Kullanıcı & Rol Yönetimi:
+  // Admin/Support/Ops kullanıcı CRUD, rol atama" — spec §6.1'e göre yalnızca
+  // Admin bu yetkiye sahip (Ops Manager/Support Agent'ın rol tablosunda yok).
+  describe('Staff user management (Admin Panel, spec §11.1)', () => {
+    it('GET/POST /users is admin-only, creates a staff account, and never leaks the password hash', async () => {
+      const forbiddenList = await request(server)
+        .get('/api/v1/users')
+        .set('Authorization', `Bearer ${opsToken}`);
+      expect(forbiddenList.status).toBe(403);
+
+      const forbiddenCreate = await request(server)
+        .post('/api/v1/users')
+        .set('Authorization', `Bearer ${opsToken}`)
+        .send({
+          email: 'misc-staff-forbidden@test.com',
+          password: 'correct-horse-battery',
+          fullName: 'Forbidden Attempt',
+          role: 'support_agent',
+        });
+      expect(forbiddenCreate.status).toBe(403);
+
+      const created = await request(server)
+        .post('/api/v1/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          email: 'misc-staff-new@test.com',
+          password: 'correct-horse-battery',
+          fullName: 'New Support Agent',
+          role: 'support_agent',
+        });
+      expect(created.status).toBe(201);
+      const createdBody = created.body as { id: string; role: string };
+      expect(createdBody.role).toBe('support_agent');
+      expect(created.body).not.toHaveProperty('passwordHash');
+
+      const duplicate = await request(server)
+        .post('/api/v1/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          email: 'misc-staff-new@test.com',
+          password: 'correct-horse-battery',
+          fullName: 'Duplicate',
+          role: 'support_agent',
+        });
+      expect(duplicate.status).toBe(409);
+
+      const list = await request(server)
+        .get('/api/v1/users')
+        .query({ role: 'support_agent' })
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(list.status).toBe(200);
+      const listBody = list.body as {
+        items: Array<{ id: string; role: string }>;
+      };
+      expect(listBody.items.some((u) => u.id === createdBody.id)).toBe(true);
+      expect(listBody.items.every((u) => u.role === 'support_agent')).toBe(
+        true,
+      );
+    });
+
+    it('rejects self-registering a staff role via POST /auth/register (still customer/field_partner only)', async () => {
+      const res = await request(server).post('/api/v1/auth/register').send({
+        email: 'misc-self-admin-attempt@test.com',
+        password: 'correct-horse-battery',
+        fullName: 'Sneaky',
+        role: 'admin',
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('PATCH /users/:id reassigns role and deactivates/reactivates, writes audit_log, and blocks self-deactivation', async () => {
+      const created = await request(server)
+        .post('/api/v1/users')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          email: 'misc-staff-patch@test.com',
+          password: 'correct-horse-battery',
+          fullName: 'Patch Target',
+          role: 'support_agent',
+        });
+      const staffId = (created.body as { id: string }).id;
+
+      const roleChange = await request(server)
+        .patch(`/api/v1/users/${staffId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'ops_manager' });
+      expect(roleChange.status).toBe(200);
+      expect((roleChange.body as { role: string }).role).toBe('ops_manager');
+
+      const deactivated = await request(server)
+        .patch(`/api/v1/users/${staffId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ isActive: false });
+      expect(deactivated.status).toBe(200);
+
+      // Devre dışı bırakılan hesap gerçekten giriş yapamıyor (bkz.
+      // auth.e2e-spec.ts'in kendi doğrudan testi — burada uçtan uca).
+      const loginAttempt = await request(server)
+        .post('/api/v1/auth/login')
+        .send({
+          email: 'misc-staff-patch@test.com',
+          password: 'correct-horse-battery',
+        });
+      expect(loginAttempt.status).toBe(401);
+
+      const reactivated = await request(server)
+        .patch(`/api/v1/users/${staffId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ isActive: true });
+      expect(reactivated.status).toBe(200);
+      const loginAfterReactivate = await request(server)
+        .post('/api/v1/auth/login')
+        .send({
+          email: 'misc-staff-patch@test.com',
+          password: 'correct-horse-battery',
+        });
+      expect(loginAfterReactivate.status).toBe(200);
+
+      const logs = await prisma.auditLog.findMany({
+        where: { entityId: staffId, action: 'user.update' },
+        orderBy: { createdAt: 'asc' },
+      });
+      expect(logs.length).toBe(3);
+      expect(logs[0].newValue).toMatchObject({ role: 'ops_manager' });
+      expect(logs[1].newValue).toMatchObject({ isActive: false });
+      expect(logs[2].newValue).toMatchObject({ isActive: true });
+
+      // Bir admin kendi hesabını devre dışı bırakamaz (kilitlenmeyi önler).
+      const selfDeactivate = await request(server)
+        .patch(`/api/v1/users/${adminUserId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ isActive: false });
+      expect(selfDeactivate.status).toBe(400);
+    });
+
+    it('PATCH /users/:id rejects targeting a non-staff account (customer/field_partner out of scope)', async () => {
+      const res = await request(server)
+        .patch(`/api/v1/users/${custIdForStaffTest}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'ops_manager' });
+      expect(res.status).toBe(400);
     });
   });
 });

@@ -149,3 +149,18 @@ export type ComplaintListItem = {
   order: { orderNumber: string; priceAmount: string; currency: string };
   raiser: { fullName: string; email: string };
 };
+
+export type StaffRole = "ops_manager" | "support_agent" | "admin";
+
+// apps/api/src/users/users.service.ts STAFF_USER_SELECT ile eşleşir.
+export type StaffUserItem = {
+  id: string;
+  email: string;
+  phone: string | null;
+  fullName: string;
+  role: StaffRole;
+  isVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+};

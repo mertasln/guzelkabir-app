@@ -12,6 +12,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './test-app.helper';
 
 type TokenResponseBody = { accessToken?: string };
@@ -19,11 +20,13 @@ type TokenResponseBody = { accessToken?: string };
 describe('Auth (e2e)', () => {
   let app: INestApplication;
   let server: App;
+  let prisma: PrismaService;
 
   beforeAll(async () => {
     const ctx = await createTestApp();
     app = ctx.app;
     server = app.getHttpServer() as App;
+    prisma = ctx.prisma;
   });
 
   afterAll(async () => {
@@ -113,6 +116,41 @@ describe('Auth (e2e)', () => {
       .post('/api/v1/auth/refresh')
       .set('Cookie', secondRefreshCookie);
     expect(afterReuse.status).toBe(401);
+  });
+
+  // Admin Panel ADIM 9 Phase 7 (Kullanıcı & Rol Yönetimi) ile bulunan gerçek
+  // boşluk: deletedAt (soft-delete) login()/refresh()'te hiç kontrol
+  // edilmiyordu — bir hesabı devre dışı bırakmak bu düzeltme olmadan
+  // kozmetik kalırdı (bkz. auth.service.ts yorumu).
+  it('rejects login for a soft-deleted (deactivated) user, and revokes an already-issued refresh token', async () => {
+    const email = 'deactivated-user@test.com';
+    const register = await request(server).post('/api/v1/auth/register').send({
+      email,
+      password: 'correct-horse-battery',
+      fullName: 'Deactivated User',
+    });
+    expect(register.status).toBe(201);
+
+    const login = await request(server)
+      .post('/api/v1/auth/login')
+      .send({ email, password: 'correct-horse-battery' });
+    expect(login.status).toBe(200);
+    const refreshCookie = extractCookie(login);
+
+    await prisma.user.update({
+      where: { email },
+      data: { deletedAt: new Date() },
+    });
+
+    const loginAfterDeactivation = await request(server)
+      .post('/api/v1/auth/login')
+      .send({ email, password: 'correct-horse-battery' });
+    expect(loginAfterDeactivation.status).toBe(401);
+
+    const refreshAfterDeactivation = await request(server)
+      .post('/api/v1/auth/refresh')
+      .set('Cookie', refreshCookie);
+    expect(refreshAfterDeactivation.status).toBe(401);
   });
 
   it("GET /users/me returns the authenticated user's server-verified fullName — apps/web needs this so a full page reload doesn't drop the displayed name to a placeholder", async () => {

@@ -10,6 +10,7 @@ import { OrdersPage } from "@/pages/OrdersPage";
 import { OrderDetailPage } from "@/pages/OrderDetailPage";
 import { AssignmentPage } from "@/pages/AssignmentPage";
 import { ComplaintsPage } from "@/pages/ComplaintsPage";
+import { UsersPage } from "@/pages/UsersPage";
 
 // spec §11.1'in 7 modülü. Sıra (bkz. CLAUDE.md "Admin Panel" bölümü, faz
 // planı): Phase 4 Partner Yönetimi, Phase 5 Sipariş/Atama, Phase 6 Şikayet,
@@ -32,10 +33,7 @@ export default function App() {
           <Route path="siparisler/:id" element={<OrderDetailPage />} />
           <Route path="atama" element={<AssignmentPage />} />
           <Route path="sikayetler" element={<ComplaintsPage />} />
-          <Route
-            path="kullanicilar"
-            element={<PlaceholderPage title="Kullanıcı & Rol Yönetimi" />}
-          />
+          <Route path="kullanicilar" element={<UsersPage />} />
           <Route
             path="mezarliklar"
             element={<PlaceholderPage title="Mezarlık & İzin Yönetimi" />}
