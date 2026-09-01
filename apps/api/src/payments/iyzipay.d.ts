@@ -69,6 +69,16 @@ declare module 'iyzipay' {
     token: string;
   }
 
+  // itemTransactions[].paymentTransactionId (SEPET KALEMİ bazlı, üstteki
+  // paymentId'den FARKLI) — refund çağrısının anahtarladığı gerçek alan.
+  // node_modules/iyzipay/test/unit/PayWithIyzicoTest.js'in mock retrieve
+  // yanıtından doğrulandı (Admin Panel Phase 6 araştırması).
+  interface IyzipayItemTransaction {
+    itemId?: string;
+    paymentTransactionId?: string;
+    price?: string;
+  }
+
   interface CheckoutFormRetrieveResult {
     status: string;
     errorCode?: string;
@@ -80,6 +90,33 @@ declare module 'iyzipay' {
     paidPrice?: string;
     currency?: string;
     basketId?: string;
+    itemTransactions?: IyzipayItemTransaction[];
+  }
+
+  // node_modules/iyzipay/lib/requests/CreateRefundRequest.js'ten birebir
+  // (v1 /payment/refund — checkout form akışıyla eşleşen sürüm, v2'nin
+  // paymentId bazlı varyantı DEĞİL, bkz. PaymentsService.refund yorumu).
+  interface RefundRequest {
+    locale: string;
+    conversationId: string;
+    paymentTransactionId: string;
+    price: string;
+    ip: string;
+    currency: string;
+    reason?: string;
+    description?: string;
+  }
+
+  // Yanıt alanları SDK kaynağında tiplenmemiş (ham JSON passthrough) —
+  // iyzico'nun standart zarfı (status/errorCode/errorMessage) dışındaki
+  // alanlar doğrulanmadı, savunmacı ele alınmalı.
+  interface RefundResult {
+    status: string;
+    errorCode?: string;
+    errorMessage?: string;
+    paymentId?: string;
+    price?: string;
+    currency?: string;
   }
 
   type IyzipayCallback<T> = (error: Error | null, result: T) => void;
@@ -98,12 +135,26 @@ declare module 'iyzipay' {
         callback: IyzipayCallback<CheckoutFormRetrieveResult>,
       ): void;
     };
+    refund: {
+      create(
+        params: RefundRequest,
+        callback: IyzipayCallback<RefundResult>,
+      ): void;
+    };
 
     static LOCALE: { TR: string; EN: string };
     static PAYMENT_GROUP: {
       PRODUCT: string;
       LISTING: string;
       SUBSCRIPTION: string;
+    };
+    // lib/Iyzipay.js'ten (doğrudan node_modules kaynağından okunarak
+    // doğrulandı — anahtarlar BÜYÜK harf, değerleri küçük harf string'ler).
+    static REFUND_REASON: {
+      DOUBLE_PAYMENT: string;
+      BUYER_REQUEST: string;
+      FRAUD: string;
+      OTHER: string;
     };
     static BASKET_ITEM_TYPE: { PHYSICAL: string; VIRTUAL: string };
     static CURRENCY: {

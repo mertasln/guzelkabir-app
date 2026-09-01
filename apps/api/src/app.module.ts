@@ -19,6 +19,7 @@ import { KpiModule } from './kpi/kpi.module';
 import { SlaModule } from './sla/sla.module';
 import { GraveLocationsModule } from './grave-locations/grave-locations.module';
 import { UsersModule } from './users/users.module';
+import { ComplaintsModule } from './complaints/complaints.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { UsersModule } from './users/users.module';
     SlaModule,
     GraveLocationsModule,
     UsersModule,
+    ComplaintsModule,
   ],
   controllers: [AppController],
   providers: [

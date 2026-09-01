@@ -26,6 +26,7 @@ type CheckoutFormRetrieveResult = {
   errorMessage?: string;
   paymentStatus?: string;
   fraudStatus?: number;
+  itemTransactions?: Array<{ paymentTransactionId?: string }>;
 };
 
 // iyzico webhook body'si (HPP/Checkout Form formatı) — spec §5.1'in "Webhook
@@ -328,6 +329,90 @@ export class PaymentsService {
       return false;
     }
     return timingSafeEqual(expectedBuf, signatureBuf);
+  }
+
+  // spec §7.3 iade akışı, iyzico'ya uyarlanmış (bkz. CLAUDE.md "Payment
+  // provider: iyzico" — Stripe Refunds API karşılığı). Admin Panel Phase 6
+  // (Şikayet Yönetimi) tarafından, bir şikayet 'resolved_refund' olarak
+  // çözüldükten SONRA, yalnızca ops_manager/admin onayıyla çağrılır.
+  //
+  // Gerçek, canlı araştırmayla bulunan gereklilik: iyzico'nun v1
+  // /payment/refund'u üstteki `paymentId` değil, sepet KALEMİ bazlı
+  // `paymentTransactionId`'yi ister (node_modules/iyzipay kaynağından
+  // doğrulandı — checkoutFormInitialize/checkoutForm.retrieve'in
+  // kullandığı AYNI SDK, farklı bir alan). Bu değer hiçbir yerde kalıcı
+  // olarak saklanmıyor (yeni bir migration/kolon GEREKMEDİ) — ödemenin
+  // kendi token'ı (providerPaymentIntentId, zaten kalıcı) üzerinden iade
+  // anında checkoutForm.retrieve ile TAZE olarak çekiliyor. Bu hem daha az
+  // değişiklikle (finalizePayment/webhook/callback yolları hiç
+  // dokunulmadı) hem de daha doğru (her zaman en güncel işlem kimliği).
+  async refund(orderId: string, description: string): Promise<void> {
+    const payment = await this.prisma.payment.findFirst({
+      where: { orderId, status: 'succeeded' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!payment) {
+      throw new BadRequestException(
+        'Bu sipariş için iade edilebilir (başarılı) bir ödeme bulunamadı.',
+      );
+    }
+    if (!payment.providerPaymentIntentId) {
+      throw new BadRequestException(
+        'Ödeme kaydında iyzico referansı yok, iade yapılamaz.',
+      );
+    }
+
+    const checkoutForm = await this.retrieveCheckoutForm(
+      payment.providerPaymentIntentId,
+    );
+    const paymentTransactionId =
+      checkoutForm.itemTransactions?.[0]?.paymentTransactionId;
+    if (!paymentTransactionId) {
+      throw new BadRequestException(
+        'iyzico işlem kimliği alınamadı, iade yapılamaz.',
+      );
+    }
+
+    const result = await new Promise<{
+      status: string;
+      errorMessage?: string;
+    }>((resolve, reject) => {
+      this.iyzico.refund.create(
+        {
+          locale: Iyzipay.LOCALE.TR,
+          conversationId: randomUUID(),
+          paymentTransactionId,
+          price: payment.amount.toFixed(2),
+          // Sunucu-taraflı (ops/admin aksiyonuyla) tetiklenen bir iade —
+          // gerçek bir müşteri isteği IP'si yok, createIntent'teki gibi
+          // istekten alınamaz.
+          ip: '127.0.0.1',
+          currency: this.mapCurrency(payment.currency),
+          reason: Iyzipay.REFUND_REASON.BUYER_REQUEST,
+          description,
+        },
+        (error, res) => {
+          if (error) {
+            reject(
+              new Error(error instanceof Error ? error.message : String(error)),
+            );
+          } else {
+            resolve(res);
+          }
+        },
+      );
+    });
+
+    if (result.status !== 'success') {
+      throw new BadRequestException(
+        result.errorMessage ?? 'İade işlemi başarısız oldu.',
+      );
+    }
+
+    await this.prisma.payment.update({
+      where: { id: payment.id },
+      data: { status: 'refunded' },
+    });
   }
 
   private mapCurrency(currency: string): string {

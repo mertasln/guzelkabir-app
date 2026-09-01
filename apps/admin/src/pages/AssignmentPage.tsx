@@ -5,7 +5,7 @@ import type { CursorPage, OrderListItem, PartnerListItem } from "@/lib/types";
 import { useConfirmedMutation } from "@/lib/useConfirmedMutation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SlaCountdown } from "@/components/SlaCountdown";
+import { AssignmentSlaCountdown } from "@/components/SlaCountdown";
 import { cn } from "@/lib/utils";
 
 type AssignVariables = {
@@ -97,7 +97,7 @@ export function AssignmentPage() {
                     </p>
                     <p className="text-xs text-[var(--muted-foreground)]">{order.customer.fullName}</p>
                   </div>
-                  <SlaCountdown referenceTime={order.updatedAt} />
+                  <AssignmentSlaCountdown referenceTime={order.updatedAt} />
                 </div>
               </Card>
             ))}

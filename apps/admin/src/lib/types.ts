@@ -123,3 +123,29 @@ export type OrderDetail = {
   assignedPartner: { id: string; user: { fullName: string } } | null;
   graveLocation: GraveLocation;
 };
+
+export type ComplaintCategory = "quality" | "disrespect" | "no_show" | "other";
+
+export type ComplaintStatus =
+  | "open"
+  | "investigating"
+  | "resolved_refund"
+  | "resolved_reservice"
+  | "rejected";
+
+// apps/api/src/complaints/complaints.service.ts COMPLAINT_LIST_SELECT ile eşleşir.
+export type ComplaintListItem = {
+  id: string;
+  orderId: string;
+  raisedBy: string;
+  category: ComplaintCategory;
+  description: string;
+  status: ComplaintStatus;
+  resolutionNotes: string | null;
+  resolvedAt: string | null;
+  slaDeadline: string | null;
+  createdAt: string;
+  updatedAt: string;
+  order: { orderNumber: string; priceAmount: string; currency: string };
+  raiser: { fullName: string; email: string };
+};
