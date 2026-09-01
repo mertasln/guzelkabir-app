@@ -2,13 +2,14 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
-// spec §11.1'in 7 modülü — Phase 3 yalnızca kabuğu (nav + layout) kurar,
-// her modül kendi fazında gerçek bir sayfayla değiştirilecek (bkz. CLAUDE.md
-// "Admin Panel" bölümü, faz planı).
+// spec §11.1'in 7 modülü — Sipariş Yönetimi ve Atama Ekranı AYRI modüller
+// (Phase 3'te yanlışlıkla tek nav öğesine birleştirilmişti, Phase 5'te
+// düzeltildi — bkz. CLAUDE.md "Admin Panel" bölümü).
 const NAV_ITEMS = [
   { to: "/", label: "Panel", end: true },
   { to: "/partnerler", label: "Partner Yönetimi" },
   { to: "/siparisler", label: "Sipariş Yönetimi" },
+  { to: "/atama", label: "Atama Ekranı" },
   { to: "/sikayetler", label: "Şikayet Yönetimi" },
   { to: "/kullanicilar", label: "Kullanıcı & Rol Yönetimi" },
   { to: "/mezarliklar", label: "Mezarlık & İzin Yönetimi" },

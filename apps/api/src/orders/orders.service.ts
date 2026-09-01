@@ -42,8 +42,52 @@ function getDefaultGeotagToleranceM(): number {
 
 // ADIM 8 (saha PWA, spec §12.1 madde 27): Görev Detayı ekranı adres/mezarlık
 // bilgisini gösterebilmek için grave_location+cemetery join'i gerektiriyor.
+// Admin Panel Phase 5: sipariş detay ekranı (spec §11.1) müşteri/partner adı
+// da gösteriyor — `assignedPartner` burada da (Order listesindeki
+// ORDER_LIST_SELECT ile aynı nedenle) dar bir `select`, `include: true`
+// DEĞİL.
 type OrderWithLocation = Prisma.OrderGetPayload<{
-  include: { graveLocation: { include: { cemetery: true } } };
+  include: {
+    graveLocation: { include: { cemetery: true } };
+    customer: { select: { fullName: true; email: true } };
+    assignedPartner: {
+      select: { id: true; user: { select: { fullName: true } } };
+    };
+  };
+}>;
+
+// Admin Panel Phase 5 (spec §11.1 "Sipariş Yönetimi: ... durum, şehir,
+// tarih, partner" + "Atama Ekranı: ... müsait saha partnerleri"): liste
+// ekranının şehir/müşteri/partner adı göstermesi gerekiyor. `assignedPartner`
+// burada AÇIK select ile join'leniyor — partners.service.ts'te bulunan
+// nationalIdEncrypted sızıntısıyla (bkz. o dosyanın yorumu) aynı hatayı
+// burada TEKRARLAMAMAK için `include: true` değil, dar bir `select`.
+const ORDER_LIST_SELECT = {
+  id: true,
+  orderNumber: true,
+  customerId: true,
+  serviceType: true,
+  status: true,
+  preferredDate: true,
+  priceAmount: true,
+  currency: true,
+  assignedPartnerId: true,
+  assignedAt: true,
+  completedAt: true,
+  approvalDeadline: true,
+  createdAt: true,
+  updatedAt: true,
+  customer: { select: { fullName: true, email: true } },
+  graveLocation: {
+    select: { cemetery: { select: { name: true, city: true } } },
+  },
+  assignedPartner: {
+    select: { id: true, user: { select: { fullName: true } } },
+  },
+} satisfies Prisma.OrderSelect;
+
+export type OrderListItem = Prisma.OrderGetPayload<{
+  select: typeof ORDER_LIST_SELECT;
 }>;
 
 @Injectable()
@@ -103,7 +147,13 @@ export class OrdersService {
   ): Promise<OrderWithLocation> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { graveLocation: { include: { cemetery: true } } },
+      include: {
+        graveLocation: { include: { cemetery: true } },
+        customer: { select: { fullName: true, email: true } },
+        assignedPartner: {
+          select: { id: true, user: { select: { fullName: true } } },
+        },
+      },
     });
     if (!order) {
       throw new NotFoundException('Sipariş bulunamadı.');
@@ -143,7 +193,7 @@ export class OrdersService {
   async findMany(
     user: AccessTokenPayload,
     query: ListOrdersQueryDto,
-  ): Promise<CursorPage<Order>> {
+  ): Promise<CursorPage<OrderListItem>> {
     if (
       user.role !== 'customer' &&
       user.role !== 'ops_manager' &&
@@ -180,6 +230,7 @@ export class OrdersService {
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: ORDER_LIST_SELECT,
     });
 
     const hasMore = items.length > limit;

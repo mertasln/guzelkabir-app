@@ -39,3 +39,87 @@ export type PartnerPayout = {
   payoutBatchId: string | null;
   createdAt: string;
 };
+
+export type OrderStatus =
+  | "draft"
+  | "pending_payment"
+  | "confirmed"
+  | "assigned"
+  | "in_progress"
+  | "completed_pending_approval"
+  | "closed"
+  | "disputed"
+  | "refunded"
+  | "cancelled";
+
+// apps/api/src/orders/orders.service.ts ORDER_LIST_SELECT ile eşleşir.
+export type OrderListItem = {
+  id: string;
+  orderNumber: string;
+  customerId: string;
+  serviceType: string;
+  status: OrderStatus;
+  preferredDate: string | null;
+  priceAmount: string;
+  currency: "TRY" | "EUR" | "USD" | "GBP";
+  assignedPartnerId: string | null;
+  assignedAt: string | null;
+  completedAt: string | null;
+  approvalDeadline: string | null;
+  createdAt: string;
+  updatedAt: string;
+  customer: { fullName: string; email: string };
+  graveLocation: { cemetery: { name: string; city: string } };
+  assignedPartner: { id: string; user: { fullName: string } } | null;
+};
+
+// apps/api/src/common/audit-log/audit-log.service.ts AuditLogEntry ile eşleşir.
+export type AuditLogItem = {
+  id: string;
+  actorId: string | null;
+  actorRole: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  oldValue: Record<string, unknown> | null;
+  newValue: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export type Cemetery = {
+  id: string;
+  name: string;
+  city: string;
+  district: string;
+};
+
+export type GraveLocation = {
+  id: string;
+  section: string | null;
+  plot: string | null;
+  locationNote: string | null;
+  cemetery: Cemetery;
+};
+
+// apps/api/src/orders/orders.service.ts OrderWithLocation ile eşleşir
+// (GET /orders/:id).
+export type OrderDetail = {
+  id: string;
+  orderNumber: string;
+  customerId: string;
+  serviceType: string;
+  status: OrderStatus;
+  preferredDate: string | null;
+  specialNotes: string | null;
+  priceAmount: string;
+  currency: "TRY" | "EUR" | "USD" | "GBP";
+  assignedPartnerId: string | null;
+  assignedAt: string | null;
+  completedAt: string | null;
+  approvalDeadline: string | null;
+  createdAt: string;
+  updatedAt: string;
+  customer: { fullName: string; email: string };
+  assignedPartner: { id: string; user: { fullName: string } } | null;
+  graveLocation: GraveLocation;
+};
