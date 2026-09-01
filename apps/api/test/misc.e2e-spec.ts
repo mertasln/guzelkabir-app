@@ -19,6 +19,7 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
   let prisma: PrismaService;
   let custToken: string;
   let adminToken: string;
+  let opsToken: string;
   let partnerToken: string;
   let partnerUserId: string;
   let graveLocationId: string;
@@ -81,8 +82,19 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
     });
     partnerUserId = partnerUser.id;
 
+    const ops = await prisma.user.create({
+      data: {
+        email: 'misc-ops@test.com',
+        passwordHash: 'x',
+        role: 'ops_manager',
+        fullName: 'Ops',
+        locale: 'tr',
+      },
+    });
+
     custToken = ctx.accessTokenFor(customer.id, 'customer');
     adminToken = ctx.accessTokenFor(admin.id, 'admin');
+    opsToken = ctx.accessTokenFor(ops.id, 'ops_manager');
     partnerToken = ctx.accessTokenFor(partnerUser.id, 'field_partner');
   });
 
@@ -267,5 +279,127 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ section: '1' });
     expect(missing.status).toBe(404);
+  });
+
+  // Admin Panel, ADIM 9: spec §11.1 "Partner Yönetimi: Onboarding onay akışı"
+  describe('Partner management (Admin Panel, spec §11.1)', () => {
+    async function createOnboardingPartner(email: string) {
+      const user = await prisma.user.create({
+        data: {
+          email,
+          passwordHash: 'x',
+          role: 'field_partner',
+          fullName: 'Onboarding Partner',
+          locale: 'tr',
+        },
+      });
+      return prisma.fieldPartner.create({
+        data: {
+          userId: user.id,
+          nationalIdEncrypted: 'x',
+          status: 'onboarding',
+          serviceCities: ['İstanbul'],
+        },
+      });
+    }
+
+    it('GET /partners is ops/admin-only and filters by status', async () => {
+      const partner = await createOnboardingPartner(
+        'misc-partner-list@test.com',
+      );
+
+      const forbidden = await request(server)
+        .get('/api/v1/partners')
+        .set('Authorization', `Bearer ${partnerToken}`);
+      expect(forbidden.status).toBe(403);
+
+      const ok = await request(server)
+        .get('/api/v1/partners')
+        .query({ status: 'onboarding' })
+        .set('Authorization', `Bearer ${opsToken}`);
+      expect(ok.status).toBe(200);
+      const body = ok.body as { items: Array<{ id: string; status: string }> };
+      expect(body.items.some((p) => p.id === partner.id)).toBe(true);
+      expect(body.items.every((p) => p.status === 'onboarding')).toBe(true);
+    });
+
+    it('POST /partners/:id/approve moves onboarding -> active and writes audit_log', async () => {
+      const partner = await createOnboardingPartner(
+        'misc-partner-approve@test.com',
+      );
+
+      const forbidden = await request(server)
+        .post(`/api/v1/partners/${partner.id}/approve`)
+        .set('Authorization', `Bearer ${partnerToken}`);
+      expect(forbidden.status).toBe(403);
+
+      const ok = await request(server)
+        .post(`/api/v1/partners/${partner.id}/approve`)
+        .set('Authorization', `Bearer ${opsToken}`);
+      expect(ok.status).toBe(200);
+      expect((ok.body as { status: string }).status).toBe('active');
+
+      const reapprove = await request(server)
+        .post(`/api/v1/partners/${partner.id}/approve`)
+        .set('Authorization', `Bearer ${opsToken}`);
+      expect(reapprove.status).toBe(400);
+
+      const logs = await prisma.auditLog.findMany({
+        where: { entityId: partner.id, action: 'partner.approve' },
+      });
+      expect(logs.length).toBe(1);
+      expect(logs[0].oldValue).toEqual({ status: 'onboarding' });
+      expect(logs[0].newValue).toEqual({ status: 'active' });
+    });
+
+    it('POST /partners/:id/reject moves onboarding -> rejected, requires a reason, writes audit_log', async () => {
+      const partner = await createOnboardingPartner(
+        'misc-partner-reject@test.com',
+      );
+
+      const noReason = await request(server)
+        .post(`/api/v1/partners/${partner.id}/reject`)
+        .set('Authorization', `Bearer ${opsToken}`)
+        .send({});
+      expect(noReason.status).toBe(400);
+
+      const ok = await request(server)
+        .post(`/api/v1/partners/${partner.id}/reject`)
+        .set('Authorization', `Bearer ${opsToken}`)
+        .send({ reason: 'Sabıka kaydı belgesi eksik/geçersiz.' });
+      expect(ok.status).toBe(200);
+      expect((ok.body as { status: string }).status).toBe('rejected');
+
+      const logs = await prisma.auditLog.findMany({
+        where: { entityId: partner.id, action: 'partner.reject' },
+      });
+      expect(logs.length).toBe(1);
+      expect(logs[0].newValue).toEqual({
+        status: 'rejected',
+        reason: 'Sabıka kaydı belgesi eksik/geçersiz.',
+      });
+    });
+
+    it('GET /partners/:id/payouts is ops/admin-only', async () => {
+      const partner = await createOnboardingPartner(
+        'misc-partner-payouts@test.com',
+      );
+
+      const forbidden = await request(server)
+        .get(`/api/v1/partners/${partner.id}/payouts`)
+        .set('Authorization', `Bearer ${partnerToken}`);
+      expect(forbidden.status).toBe(403);
+
+      const ok = await request(server)
+        .get(`/api/v1/partners/${partner.id}/payouts`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(ok.status).toBe(200);
+      expect(Array.isArray(ok.body)).toBe(true);
+
+      const missing = await request(server)
+        .get('/api/v1/partners/00000000-0000-0000-0000-000000000000/payouts')
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(missing.status).toBe(404);
+    });
   });
 });

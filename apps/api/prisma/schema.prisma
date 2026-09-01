@@ -74,6 +74,14 @@ enum FieldPartnerStatus {
   active
   suspended
   terminated
+  // spec §11.1 "Partner Yönetimi: Onboarding onay akışı" (Admin Panel) —
+  // KYC incelemesinde reddedilen bir partner için ayrı bir terminal durum.
+  // 'terminated'ı yeniden kullanmak yanlış anlatır (o, bir zamanlar aktif
+  // olmuş birini ifade eder). Red gerekçesi ayrı bir kolonda değil,
+  // audit_log'un newValue alanında tutulur — spec §11.2 zaten "kritik
+  // aksiyonlar için audit_log kaydı zorunlu" diyor, aynı ihtiyacı iki kez
+  // farklı yerlerde modellemek gereksiz.
+  rejected
 }
 
 model FieldPartner {
