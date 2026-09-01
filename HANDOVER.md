@@ -403,7 +403,12 @@ Own full sprint per explicit user decision (not opened piecemeal). Spec §18.3 o
 - `ComplaintsPage`: 3-column kanban (spec's literal Açık/İnceleniyor/Çözüldü — 5 statuses bucket into 3 columns), real SLA countdown off `Complaint.slaDeadline` (a genuine field, no proxy needed), resolution templates per outcome.
 - Live-verified via Playwright: full state machine, template auto-fill, dynamic confirm-modal text, and the refund attempt correctly rejected by the real backend (no Payment row on the test order) rather than falsely succeeding. `support_agent` confirmed unable to see or call the refund action (client and server both). Actual successful-refund path unverified without a live iyzico key — same standing limit as payment creation, covered by 4 mocked-SDK unit tests instead.
 
-All six phases verified against real Postgres (45/45 e2e after Phase 6), full monorepo lint/typecheck/build clean throughout. Remaining: Phase 7 (Kullanıcı & Rol Yönetimi), Phase 8 (Mezarlık & İzin Yönetimi), Phase 9 (KPI Dashboard UI).
+**Phase 7 (`96a456a`) done — surfaced a real auth gap.** `User.deletedAt` existed since the original schema but `login()`/`refresh()` never checked it, harmless until "deactivate a staff account" (this phase) gave it a real writer. Fixed first: a deactivated account can't log in and an already-issued refresh token for it is rejected too. An already-valid access token still works for its remaining ≤15min — accepted JWT tradeoff, not fixed.
+
+- `UsersService`: admin-only (spec §6.1's literal role table — Ops/Support don't have this authority) CRUD scoped strictly to `ops_manager`/`support_agent`/`admin` rows, password hash never selected, deactivate reuses the existing soft-delete convention, self-deactivation blocked server-side.
+- Live-verified: create → role change → deactivate → the account genuinely can't log in (checked against the real backend) → `ops_manager` blocked both server- and client-side with no data leak.
+
+All seven phases verified against real Postgres (50/50 e2e after Phase 7), full monorepo lint/typecheck/build clean throughout. Remaining: Phase 8 (Mezarlık & İzin Yönetimi), Phase 9 (KPI Dashboard UI).
 
 ## 7. Deployment workflow
 
