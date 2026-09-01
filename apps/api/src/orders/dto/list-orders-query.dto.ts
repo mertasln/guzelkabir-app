@@ -39,6 +39,12 @@ export class ListOrdersQueryDto {
   @IsDateString()
   date?: string;
 
+  // spec §11.1 "Atama Ekranı" (Admin Panel, ADIM 9) — atanmış partnere göre
+  // filtreleme, spec §5'in tablosunda yok, aynı sınıf karar diğer filtrelerle.
+  @IsOptional()
+  @IsUUID()
+  partnerId?: string;
+
   @IsOptional()
   @IsUUID()
   cursor?: string;

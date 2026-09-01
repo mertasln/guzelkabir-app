@@ -25,6 +25,7 @@ import {
   DEFAULT_PAGE_SIZE,
 } from '../common/pagination/cursor-pagination.type';
 import { AccessTokenPayload } from '../auth/types/jwt-payload.type';
+import { AuditLogService } from '../common/audit-log/audit-log.service';
 
 const APPROVAL_WINDOW_HOURS = 48;
 // spec §8.2: "Minimum 2 fotoğraf: 1 geniş açı (mezar ve çevresi), 1 detay çekimi"
@@ -50,7 +51,25 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly auditLog: AuditLogService,
   ) {}
+
+  // spec §11.1 "Sipariş Yönetimi: sipariş detay sayfası (zaman
+  // çizelgesi/audit trail görünümü)" — Admin Panel, ADIM 9. Sipariş durum
+  // geçişlerinin hepsi (bu dosyada ve SlaService'te) artık audit_log'a
+  // yazıyor, bu ekran gerçek veriye sahip olsun diye.
+  async findAuditTrail(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+    if (!order) {
+      throw new NotFoundException('Sipariş bulunamadı.');
+    }
+    return this.prisma.auditLog.findMany({
+      where: { entityType: 'order', entityId: orderId },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+  }
 
   async create(customerId: string, dto: CreateOrderDto): Promise<Order> {
     const graveLocation = await this.prisma.graveLocation.findUnique({
@@ -151,6 +170,9 @@ export class OrdersService {
         cemetery: { city: { equals: query.city, mode: 'insensitive' } },
       };
     }
+    if (query.partnerId) {
+      where.assignedPartnerId = query.partnerId;
+    }
 
     const limit = query.limit ?? DEFAULT_PAGE_SIZE;
     const items = await this.prisma.order.findMany({
@@ -171,7 +193,11 @@ export class OrdersService {
   // spec §6.2/§17: field partner KYC tamamlanmadan (kimlik+sabıka+sözleşme)
   // görev ataması engellenir — status='active' zorunlu kontrolü. Kullanıcı
   // talebi gereği DB trigger DEĞİL, servis katmanında açık kontrol.
-  async assign(orderId: string, dto: AssignOrderDto): Promise<Order> {
+  async assign(
+    orderId: string,
+    dto: AssignOrderDto,
+    actor: AccessTokenPayload,
+  ): Promise<Order> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
@@ -196,7 +222,7 @@ export class OrdersService {
       );
     }
 
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: {
         assignedPartnerId: partner.id,
@@ -204,6 +230,16 @@ export class OrdersService {
         status: 'assigned',
       },
     });
+    await this.auditLog.record({
+      actorId: actor.sub,
+      actorRole: actor.role,
+      action: 'order.assign',
+      entityType: 'order',
+      entityId: orderId,
+      oldValue: { status: order.status, assignedPartnerId: null },
+      newValue: { status: updated.status, assignedPartnerId: partner.id },
+    });
+    return updated;
   }
 
   // spec §2.3 madde 5 / §12.1 madde 27: saha partneri görevi "Başladı" olarak
@@ -218,10 +254,20 @@ export class OrdersService {
         `Sipariş 'assigned' durumunda değilken başlatılamaz (mevcut durum: ${order.status}).`,
       );
     }
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { id: order.id },
       data: { status: 'in_progress' },
     });
+    await this.auditLog.record({
+      actorId: user.sub,
+      actorRole: user.role,
+      action: 'order.start',
+      entityType: 'order',
+      entityId: order.id,
+      oldValue: { status: order.status },
+      newValue: { status: updated.status },
+    });
+    return updated;
   }
 
   // spec §8.1 madde 14: istemci fotoğrafı doğrudan S3 pre-signed URL'e yükler,
@@ -384,7 +430,7 @@ export class OrdersService {
     const approvalDeadline = new Date(
       completedAt.getTime() + APPROVAL_WINDOW_HOURS * 60 * 60 * 1000,
     );
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { id: order.id },
       data: {
         status: 'completed_pending_approval',
@@ -392,6 +438,16 @@ export class OrdersService {
         approvalDeadline,
       },
     });
+    await this.auditLog.record({
+      actorId: user.sub,
+      actorRole: user.role,
+      action: 'order.complete',
+      entityType: 'order',
+      entityId: order.id,
+      oldValue: { status: order.status },
+      newValue: { status: updated.status, approvalDeadline },
+    });
+    return updated;
   }
 
   async approve(orderId: string, user: AccessTokenPayload): Promise<Order> {
@@ -412,8 +468,8 @@ export class OrdersService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.order.update({
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updatedOrder = await tx.order.update({
         where: { id: order.id },
         data: { status: 'closed' },
       });
@@ -431,8 +487,18 @@ export class OrdersService {
           },
         });
       }
-      return updated;
+      return updatedOrder;
     });
+    await this.auditLog.record({
+      actorId: user.sub,
+      actorRole: user.role,
+      action: 'order.approve',
+      entityType: 'order',
+      entityId: order.id,
+      oldValue: { status: order.status },
+      newValue: { status: updated.status },
+    });
+    return updated;
   }
 
   async addComplaint(
@@ -480,6 +546,17 @@ export class OrdersService {
           ]
         : []),
     ]);
+    if (order.status === 'completed_pending_approval') {
+      await this.auditLog.record({
+        actorId: user.sub,
+        actorRole: user.role,
+        action: 'order.dispute',
+        entityType: 'order',
+        entityId: order.id,
+        oldValue: { status: order.status },
+        newValue: { status: 'disputed', complaintId: complaint.id },
+      });
+    }
     return complaint;
   }
 

@@ -141,6 +141,15 @@ describe('Orders (e2e)', () => {
       .send({ fieldPartnerId: partnerId });
     expect(accepted.status).toBe(200);
     expect((accepted.body as OrderResponseBody).status).toBe('assigned');
+
+    const logs = await prisma.auditLog.findMany({
+      where: { entityId: order.id, action: 'order.assign' },
+    });
+    expect(logs.length).toBe(1);
+    expect(logs[0].newValue).toEqual({
+      status: 'assigned',
+      assignedPartnerId: partnerId,
+    });
   });
 
   it('enforces the assigned → in_progress → completed_pending_approval → closed chain (spec §21.2)', async () => {
@@ -225,6 +234,32 @@ describe('Orders (e2e)', () => {
       where: { orderId: order.id },
     });
     expect(payout?.status).toBe('pending');
+
+    // spec §11.1 "Sipariş Yönetimi: ... zaman çizelgesi/audit trail
+    // görünümü" (Admin Panel, ADIM 9) — her durum geçişi audit_log'a yazılmış
+    // olmalı, ekranın gösterecek gerçek verisi olsun.
+    const auditRes = await request(server)
+      .get(`/api/v1/orders/${order.id}/audit`)
+      .set('Authorization', `Bearer ${opsToken}`);
+    expect(auditRes.status).toBe(200);
+    const auditActions = (auditRes.body as { action: string }[]).map(
+      (e) => e.action,
+    );
+    expect(auditActions).toEqual([
+      'order.start',
+      'order.complete',
+      'order.approve',
+    ]);
+
+    const filteredRes = await request(server)
+      .get('/api/v1/orders')
+      .query({ partnerId })
+      .set('Authorization', `Bearer ${opsToken}`);
+    expect(filteredRes.status).toBe(200);
+    const filteredIds = (
+      filteredRes.body as { items: { id: string }[] }
+    ).items.map((o) => o.id);
+    expect(filteredIds).toContain(order.id);
   });
 
   it('transitions completed_pending_approval → disputed when a complaint is raised (spec §21.2)', async () => {
@@ -257,6 +292,11 @@ describe('Orders (e2e)', () => {
       where: { id: order.id },
     });
     expect(updatedOrder?.status).toBe('disputed');
+
+    const logs = await prisma.auditLog.findMany({
+      where: { entityId: order.id, action: 'order.dispute' },
+    });
+    expect(logs.length).toBe(1);
   });
 
   it('dedupes POST /orders when the same Idempotency-Key is reused (spec §5.1)', async () => {

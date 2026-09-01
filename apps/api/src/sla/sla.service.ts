@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogService } from '../common/audit-log/audit-log.service';
+
+// spec §11.1 "Sipariş Yönetimi: ... zaman çizelgesi/audit trail görünümü" —
+// SLA otomasyonu bir insan aksiyonu değil, actorId=null/actorRole='system'
+// ile işaretlenir. audit_log.actorId nullable, tam bunun için.
+const SYSTEM_ACTOR_ROLE = 'system';
 
 // spec §7.1 madde 12: "...24 saat sonra otomatik iptal"
 const PAYMENT_TIMEOUT_HOURS = 24;
@@ -10,7 +16,10 @@ const ASSIGNMENT_SLA_MINUTES = 30;
 export class SlaService {
   private readonly logger = new Logger(SlaService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
   /**
    * spec §7.1 madde 12: "Ödeme reddi/başarısızlığında sipariş 'pending_payment'
@@ -27,16 +36,34 @@ export class SlaService {
     const cutoff = new Date(
       Date.now() - PAYMENT_TIMEOUT_HOURS * 60 * 60 * 1000,
     );
-    const result = await this.prisma.order.updateMany({
+    // Admin Panel'in zaman çizelgesi görünümü (spec §11.1) her siparişin kendi
+    // audit_log kaydını istediği için tek bir updateMany yerine satır satır
+    // güncelleniyor — spec bu sweep için bir performans hedefi vermiyor,
+    // MVP1 hacminde (pilot ölçeği) bu fark yaratmaz.
+    const overdue = await this.prisma.order.findMany({
       where: { status: 'pending_payment', updatedAt: { lt: cutoff } },
-      data: { status: 'cancelled' },
     });
-    if (result.count > 0) {
+    for (const order of overdue) {
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'cancelled' },
+      });
+      await this.auditLog.record({
+        actorId: undefined,
+        actorRole: SYSTEM_ACTOR_ROLE,
+        action: 'order.auto_cancel',
+        entityType: 'order',
+        entityId: order.id,
+        oldValue: { status: order.status },
+        newValue: { status: 'cancelled' },
+      });
+    }
+    if (overdue.length > 0) {
       this.logger.log(
-        `${result.count} ödenmemiş sipariş 24 saat sonra otomatik iptal edildi.`,
+        `${overdue.length} ödenmemiş sipariş 24 saat sonra otomatik iptal edildi.`,
       );
     }
-    return result.count;
+    return overdue.length;
   }
 
   /**
@@ -74,6 +101,15 @@ export class SlaService {
             });
           }
         }
+      });
+      await this.auditLog.record({
+        actorId: undefined,
+        actorRole: SYSTEM_ACTOR_ROLE,
+        action: 'order.auto_close',
+        entityType: 'order',
+        entityId: order.id,
+        oldValue: { status: order.status },
+        newValue: { status: 'closed' },
       });
     }
 

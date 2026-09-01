@@ -58,8 +58,20 @@ export class OrdersController {
 
   @Roles('ops_manager', 'admin')
   @Patch(':id/assign')
-  assign(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AssignOrderDto) {
-    return this.ordersService.assign(id, dto);
+  assign(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AssignOrderDto,
+    @CurrentUser() user: AccessTokenPayload,
+  ) {
+    return this.ordersService.assign(id, dto, user);
+  }
+
+  // spec §11.1 "Sipariş Yönetimi: sipariş detay sayfası (zaman
+  // çizelgesi/audit trail görünümü)" — Admin Panel, ADIM 9.
+  @Roles('ops_manager', 'admin')
+  @Get(':id/audit')
+  findAuditTrail(@Param('id', ParseUUIDPipe) id: string) {
+    return this.ordersService.findAuditTrail(id);
   }
 
   // spec §5'in tablosunda yok — §21.2 durum makinesinin assigned→in_progress

@@ -3,7 +3,9 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export type AuditLogEntry = {
-  actorId: string;
+  // Sistem/otomasyon kaynaklı aksiyonlar (bkz. SlaService) için undefined —
+  // audit_log.actorId nullable, insan aksiyonlarından ayırt edilebilsin diye.
+  actorId?: string;
   actorRole: string;
   action: string;
   entityType: string;

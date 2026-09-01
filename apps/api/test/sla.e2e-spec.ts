@@ -128,6 +128,15 @@ describe('SLA sweeps (e2e)', () => {
     });
     expect(oldAfter?.status).toBe('cancelled');
     expect(recentAfter?.status).toBe('pending_payment');
+
+    // spec §11.1 zaman çizelgesi görünümü: SLA otomasyonu da audit_log'a
+    // yazar, insan aksiyonlarından actorId=null/actorRole='system' ile ayrılır.
+    const logs = await prisma.auditLog.findMany({
+      where: { entityId: old.id, action: 'order.auto_cancel' },
+    });
+    expect(logs.length).toBe(1);
+    expect(logs[0].actorId).toBeNull();
+    expect(logs[0].actorRole).toBe('system');
   });
 
   it('auto-closes completed_pending_approval orders past their approval deadline and creates a payout (spec §2.3 madde 7/§17)', async () => {
@@ -163,6 +172,12 @@ describe('SLA sweeps (e2e)', () => {
       where: { orderId: order.id },
     });
     expect(payoutCount).toBe(1);
+
+    const logs = await prisma.auditLog.findMany({
+      where: { entityId: order.id, action: 'order.auto_close' },
+    });
+    expect(logs.length).toBe(1);
+    expect(logs[0].actorId).toBeNull();
   });
 
   it('escalates confirmed orders unassigned past 30min and does not duplicate notifications on re-sweep (spec §17)', async () => {
