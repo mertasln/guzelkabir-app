@@ -1,0 +1,520 @@
+// Mezarlık Bakım Platformu — Veritabanı Şeması
+// Kaynak: docs/muhendislik-spec.pdf §4 (Veritabanı Şeması — PostgreSQL)
+//
+// Ortak taban alanlar (spec §4 girişi): her tabloda id (UUID, PK), created_at,
+// updated_at, deleted_at (soft delete) bulunur — bu şablonu her modelde tekrarlıyoruz.
+// Tek istisna: audit_log — spec §4.7 onu "immutable, append-only" olarak tanımlıyor,
+// bu yüzden updated_at/deleted_at eklemedik (bkz. model yorumu).
+
+// NOT: Prisma 6'nın yeni "prisma-client" (ESM-only) generator'ı yerine bilinçli
+// olarak klasik "prisma-client-js" seçildi — NestJS'in ts-node/CommonJS tabanlı
+// araç zinciriyle (bkz. apps/api/tsconfig.json) ESM-only generator "exports is
+// not defined in ES module scope" hatasıyla çakışıyor. @prisma/client, NestJS
+// dokümantasyonu ve topluluk örneklerinin standart, CJS+ESM uyumlu seçimi.
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+// ---------------------------------------------------------------------------
+// 4.1 users
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  customer
+  ops_manager
+  field_partner
+  support_agent
+  admin
+}
+
+enum KycStatus {
+  pending
+  verified
+  rejected
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique @db.VarChar(255)
+  phone        String?   @db.VarChar(20)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  role         UserRole
+  fullName     String    @map("full_name") @db.VarChar(255)
+  locale       String    @db.VarChar(10)
+  isVerified   Boolean   @default(false) @map("is_verified")
+  kycStatus    KycStatus @default(pending) @map("kyc_status")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  fieldPartner     FieldPartner?
+  ordersAsCustomer Order[]         @relation("OrderCustomer")
+  uploadedEvidence EvidencePhoto[] @relation("EvidenceUploadedBy")
+  subscriptions    Subscription[]
+  complaintsRaised Complaint[]     @relation("ComplaintRaisedBy")
+  notifications    Notification[]
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// 4.2 field_partners
+// ---------------------------------------------------------------------------
+
+enum FieldPartnerStatus {
+  onboarding
+  active
+  suspended
+  terminated
+}
+
+model FieldPartner {
+  id                        String             @id @default(uuid()) @db.Uuid
+  userId                    String             @unique @map("user_id") @db.Uuid
+  nationalIdEncrypted       String             @map("national_id_encrypted") @db.Text
+  criminalRecordCheck       Boolean            @default(false) @map("criminal_record_check")
+  documentUrl               String?            @map("document_url") @db.Text
+  insurancePolicyNo         String?            @map("insurance_policy_no") @db.VarChar(100)
+  serviceCities             String[]           @map("service_cities")
+  ratingAvg                 Decimal?           @map("rating_avg") @db.Decimal(3, 2)
+  status                    FieldPartnerStatus @default(onboarding)
+  contractSignedAt          DateTime?          @map("contract_signed_at")
+  ethicsTrainingCompletedAt DateTime?          @map("ethics_training_completed_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  user           User            @relation(fields: [userId], references: [id])
+  assignedOrders Order[]         @relation("OrderAssignedPartner")
+  payouts        PartnerPayout[]
+
+  @@map("field_partners")
+}
+
+// ---------------------------------------------------------------------------
+// 4.3 cemeteries ve grave_locations
+// ---------------------------------------------------------------------------
+
+enum PermitStatus {
+  pending
+  approved
+  rejected
+}
+
+model Cemetery {
+  id                    String       @id @default(uuid()) @db.Uuid
+  name                  String       @db.VarChar(255)
+  city                  String       @db.VarChar(120)
+  district              String       @db.VarChar(120)
+  municipalityAuthority String       @map("municipality_authority") @db.VarChar(255)
+  permitStatus          PermitStatus @default(pending) @map("permit_status")
+  permitDocumentUrl     String?      @map("permit_document_url") @db.Text
+  lat                   Decimal?     @db.Decimal
+  lng                   Decimal?     @db.Decimal
+  // spec §8.1: "varsayılan tolerans: 150 metre — mezarlık büyüklüğüne göre
+  // yapılandırılabilir" — spec §4'ün tablo listesinde bu alan yok (bilinen
+  // boşluk, ADIM 7 kararı). NULL ise GEOTAG_DEFAULT_TOLERANCE_M env'ine düşer
+  // (bkz. src/orders/evidence-geo.util.ts) — tek bir global env değişkeni
+  // "mezarlık büyüklüğüne göre" şartını karşılayamaz, bu yüzden mezarlık başına.
+  geotagToleranceM      Int?         @map("geotag_tolerance_m")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  graveLocations GraveLocation[]
+
+  @@map("cemeteries")
+}
+
+model GraveLocation {
+  id                String   @id @default(uuid()) @db.Uuid
+  cemeteryId        String   @map("cemetery_id") @db.Uuid
+  // "Yardım isteyin" akışı (müşteri bilerek ada/parsel bilmiyor, saha ekibi
+  // tespit edecek): section/plot bilinçli olarak NULL bırakılır — spec'in aynı
+  // tabloda lat/lng'ye uyguladığı "saha ekibi sonra doldurur" prensibiyle
+  // tutarlı, sahte/yer tutucu metin yazılmaz (kullanıcı kararı, ADIM 5). Sonradan
+  // PATCH /grave-locations/:id (ops_manager/admin/field_partner) ile doldurulur.
+  section           String?  @db.VarChar(50)
+  plot              String?  @db.VarChar(50)
+  graveNo           String?  @map("grave_no") @db.VarChar(50)
+  // Hassas/kişisel veri — spec §14.1: "Kişisel" sınıfı, RBAC ile sınırlı erişim,
+  // pazarlama amacıyla asla kullanılmaz. Alan bazlı şifreleme (AES-256) yalnızca
+  // "Hassas" sınıf (TC/pasaport, sabıka) için zorunlu; burada erişim kontrolü yeterli.
+  deceasedName      String?  @map("deceased_name") @db.VarChar(255)
+  locationNote      String?  @map("location_note") @db.Text
+  lat               Decimal? @db.Decimal
+  lng               Decimal? @db.Decimal
+  referencePhotoUrl String?  @map("reference_photo_url") @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  cemetery      Cemetery       @relation(fields: [cemeteryId], references: [id])
+  orders        Order[]
+  subscriptions Subscription[]
+
+  // spec §4.8: "grave_locations üzerinde PostGIS GIST indeksi (konum bazlı yakınlık
+  // sorguları için)". Prisma'nın şema DSL'i coğrafi geography kolonunu native temsil
+  // edemiyor; PostGIS point + GIST indeksi migration'a ek ham SQL olarak eklendi
+  // (bkz. prisma/migrations/*_add_postgis_grave_location_geography).
+  @@map("grave_locations")
+}
+
+// ---------------------------------------------------------------------------
+// 4.4 orders
+// ---------------------------------------------------------------------------
+
+enum ServiceType {
+  cleaning
+  watering
+  flowers
+  full_package
+  subscription
+}
+
+enum OrderStatus {
+  draft
+  pending_payment
+  confirmed
+  assigned
+  in_progress
+  completed_pending_approval
+  closed
+  disputed
+  refunded
+  cancelled
+}
+
+enum OrderCurrency {
+  TRY
+  EUR
+  USD
+  GBP
+}
+
+model Order {
+  id                String        @id @default(uuid()) @db.Uuid
+  orderNumber       String        @unique @map("order_number") @db.VarChar(20)
+  customerId        String        @map("customer_id") @db.Uuid
+  graveLocationId   String        @map("grave_location_id") @db.Uuid
+  serviceType       ServiceType   @map("service_type")
+  status            OrderStatus   @default(draft)
+  preferredDate     DateTime?     @map("preferred_date") @db.Date
+  // Müşterinin sipariş formunda girdiği özel talep (spec §4.4: max 500 karakter —
+  // VARCHAR(500) bunu DB seviyesinde zaten uyguluyor, ayrı CHECK constraint gerekmez).
+  // NOT: Bu, sahadaki ustanın tamamlama notundan ("saha notu", §8.2/§12.1/§17 — max
+  // 200 karakter, zorunlu) FARKLI bir alan. Spec'in §4 şema bölümü saha notu için
+  // AÇIKÇA bir kolon tanımlamıyor (ne orders ne evidence_photos altında) — bu bir
+  // spec boşluğu. ADIM 4/5'te "complete" endpoint'i tasarlanırken bu alanın nereye
+  // (orders.field_note mu, evidence_photos.field_note mu) ekleneceği kullanıcıya
+  // sorulacak; şimdiden icat edilmedi.
+  specialNotes      String?       @map("special_notes") @db.VarChar(500)
+  priceAmount       Decimal       @map("price_amount") @db.Decimal(10, 2)
+  currency          OrderCurrency
+  assignedPartnerId String?       @map("assigned_partner_id") @db.Uuid
+  assignedAt        DateTime?     @map("assigned_at")
+  completedAt       DateTime?     @map("completed_at")
+  approvalDeadline  DateTime?     @map("approval_deadline")
+  subscriptionId    String?       @map("subscription_id") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  customer        User            @relation("OrderCustomer", fields: [customerId], references: [id])
+  graveLocation   GraveLocation   @relation(fields: [graveLocationId], references: [id])
+  assignedPartner FieldPartner?   @relation("OrderAssignedPartner", fields: [assignedPartnerId], references: [id])
+  subscription    Subscription?   @relation(fields: [subscriptionId], references: [id])
+  evidencePhotos  EvidencePhoto[]
+  payments        Payment[]
+  complaints      Complaint[]
+  partnerPayouts  PartnerPayout[]
+
+  // spec §4.8 bileşik indeksler:
+  @@index([status, assignedPartnerId])
+  @@index([customerId, createdAt(sort: Desc)])
+  @@map("orders")
+}
+
+// ---------------------------------------------------------------------------
+// 4.5 evidence_photos
+// ---------------------------------------------------------------------------
+
+enum PhotoType {
+  wide_shot
+  detail_shot
+  before
+  after
+}
+
+enum GeotagValidationStatus {
+  valid
+  gps_mismatch
+  timestamp_mismatch
+  missing_exif
+  manual_review
+}
+
+model EvidencePhoto {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  orderId                String                 @map("order_id") @db.Uuid
+  uploadedBy             String                 @map("uploaded_by") @db.Uuid
+  photoType              PhotoType              @map("photo_type")
+  fileUrl                String                 @map("file_url") @db.Text
+  exifGpsLat             Decimal?               @map("exif_gps_lat") @db.Decimal
+  exifGpsLng             Decimal?               @map("exif_gps_lng") @db.Decimal
+  exifTimestamp          DateTime?              @map("exif_timestamp")
+  serverReceivedAt       DateTime               @default(now()) @map("server_received_at")
+  geotagValidationStatus GeotagValidationStatus @default(manual_review) @map("geotag_validation_status")
+  distanceFromGraveM     Decimal?               @map("distance_from_grave_m") @db.Decimal
+  // "Saha notu" (spec §8.1/§8.2/§12.1/§17, max 200 karakter) — spec §4 şema
+  // bölümünde bu alan için açık bir kolon yoktu (bilinen spec boşluğu). Kullanıcı
+  // kararı: evidence_photos'a eklenir (kanıt yükleme turuyla birlikte gönderilen
+  // not, §8.1), orders'a değil; ayrı bir ara tablo açılmadı.
+  fieldNote              String?                @map("field_note") @db.VarChar(200)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  order    Order @relation(fields: [orderId], references: [id])
+  uploader User  @relation("EvidenceUploadedBy", fields: [uploadedBy], references: [id])
+
+  // spec §4.8: evidence_photos(order_id) indeksi
+  @@index([orderId])
+  @@map("evidence_photos")
+}
+
+// ---------------------------------------------------------------------------
+// 4.6 payments, subscriptions, partner_payouts
+// ---------------------------------------------------------------------------
+
+// spec §4.6'nın orijinal metni "provider (stripe|paypal)" der — Türkiye'de
+// kurulu bir şirket için ikisi de kullanılamıyor (bkz. CLAUDE.md "Payment
+// provider: iyzico, not Stripe"), o yüzden `iyzico` eklendi. `stripe`/`paypal`
+// şema geçmişi için (ve mevcut satırlar için) bırakıldı, uygulama artık
+// yalnızca `iyzico` üretiyor.
+enum PaymentProvider {
+  stripe
+  paypal
+  iyzico
+}
+
+enum PaymentStatus {
+  requires_action
+  succeeded
+  failed
+  refunded
+  chargeback
+}
+
+model Payment {
+  id                      String          @id @default(uuid()) @db.Uuid
+  orderId                 String          @map("order_id") @db.Uuid
+  provider                PaymentProvider
+  providerPaymentIntentId String?         @map("provider_payment_intent_id") @db.VarChar(255)
+  amount                  Decimal         @db.Decimal(10, 2)
+  currency                OrderCurrency
+  status                  PaymentStatus
+  paymentMethodType       String?         @map("payment_method_type") @db.VarChar(50)
+  threeDsStatus           String?         @map("three_ds_status") @db.VarChar(50)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+enum SubscriptionPlan {
+  monthly
+  annual
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  cancelled
+}
+
+model Subscription {
+  id                              String             @id @default(uuid()) @db.Uuid
+  customerId                      String             @map("customer_id") @db.Uuid
+  graveLocationId                 String             @map("grave_location_id") @db.Uuid
+  plan                            SubscriptionPlan
+  priceAmount                     Decimal            @map("price_amount") @db.Decimal(10, 2)
+  currency                        OrderCurrency
+  // spec §4.6'nın orijinal metni "stripe_subscription_id" der — Stripe artık
+  // kullanılamadığı için (bkz. CLAUDE.md "Payment provider: iyzico, not
+  // Stripe") iyzico'nun kendi Subscription API'sinin referans koduna göre
+  // yeniden adlandırıldı. Bu ADIM'da yalnızca alan adı güncellendi; iyzico'nun
+  // Subscription API'sine gerçek bağlanma (spec §7.2) ayrı, daha büyük bir iş
+  // — CLAUDE.md'de "gerçek yapısal değişiklik, birebir takas değil" olarak
+  // flag'lendi, henüz yapılmadı.
+  iyzicoSubscriptionReferenceCode String?            @map("iyzico_subscription_reference_code") @db.VarChar(255)
+  status                          SubscriptionStatus @default(active)
+  nextBillingDate                 DateTime?          @map("next_billing_date") @db.Date
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  customer      User          @relation(fields: [customerId], references: [id])
+  graveLocation GraveLocation @relation(fields: [graveLocationId], references: [id])
+  orders        Order[]
+
+  @@map("subscriptions")
+}
+
+enum PayoutStatus {
+  pending
+  paid
+  held_dispute
+}
+
+model PartnerPayout {
+  id             String       @id @default(uuid()) @db.Uuid
+  fieldPartnerId String       @map("field_partner_id") @db.Uuid
+  orderId        String       @map("order_id") @db.Uuid
+  amount         Decimal      @db.Decimal(10, 2)
+  status         PayoutStatus @default(pending)
+  paidAt         DateTime?    @map("paid_at")
+  payoutBatchId  String?      @map("payout_batch_id") @db.VarChar(100)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  fieldPartner FieldPartner @relation(fields: [fieldPartnerId], references: [id])
+  order        Order        @relation(fields: [orderId], references: [id])
+
+  @@map("partner_payouts")
+}
+
+// ---------------------------------------------------------------------------
+// 4.7 complaints, notifications, audit_log
+// ---------------------------------------------------------------------------
+
+enum ComplaintCategory {
+  quality
+  disrespect
+  no_show
+  other
+}
+
+enum ComplaintStatus {
+  open
+  investigating
+  resolved_refund
+  resolved_reservice
+  rejected
+}
+
+model Complaint {
+  id              String            @id @default(uuid()) @db.Uuid
+  orderId         String            @map("order_id") @db.Uuid
+  raisedBy        String            @map("raised_by") @db.Uuid
+  category        ComplaintCategory
+  description     String            @db.Text
+  status          ComplaintStatus   @default(open)
+  resolutionNotes String?           @map("resolution_notes") @db.Text
+  resolvedAt      DateTime?         @map("resolved_at")
+  // completed_at + 48 saat (spec §4.7 / §17)
+  slaDeadline     DateTime?         @map("sla_deadline")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  order  Order @relation(fields: [orderId], references: [id])
+  raiser User  @relation("ComplaintRaisedBy", fields: [raisedBy], references: [id])
+
+  @@map("complaints")
+}
+
+enum NotificationChannel {
+  sms
+  email
+  whatsapp
+  push
+}
+
+enum NotificationStatus {
+  queued
+  sent
+  delivered
+  failed
+}
+
+model Notification {
+  id          String              @id @default(uuid()) @db.Uuid
+  userId      String              @map("user_id") @db.Uuid
+  channel     NotificationChannel
+  templateKey String              @map("template_key") @db.VarChar(120)
+  payload     Json
+  status      NotificationStatus  @default(queued)
+  sentAt      DateTime?           @map("sent_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+// audit_log: spec §4.7 açıkça "immutable, append-only" diyor — bu yüzden diğer
+// tabloların aksine updated_at/deleted_at YOK (satır hiç değişmez/silinmez).
+// actor_id kasıtlı olarak FK ilişkisi olarak modellenmedi: bir kullanıcı silinse
+// bile denetim kaydı adli/uyumluluk amaçlı değişmeden kalmalı (§14.2 KVKK denetimi).
+model AuditLog {
+  id         String  @id @default(uuid()) @db.Uuid
+  actorId    String? @map("actor_id") @db.Uuid
+  actorRole  String? @map("actor_role") @db.VarChar(50)
+  action     String  @db.VarChar(120)
+  entityType String  @map("entity_type") @db.VarChar(80)
+  entityId   String  @map("entity_id") @db.Uuid
+  oldValue   Json?   @map("old_value")
+  newValue   Json?   @map("new_value")
+  ipAddress  String? @map("ip_address") @db.VarChar(45)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // spec §4.8: audit_log(entity_type, entity_id) indeksi
+  @@index([entityType, entityId])
+  @@map("audit_log")
+}
+
+// ---------------------------------------------------------------------------
+// processed_webhook_events — spec §5.1
+// ---------------------------------------------------------------------------
+// Spec §4'ün tablo listesinde YOK ama §5.1 açıkça zorunlu tutuyor: "Webhook
+// endpointleri imza doğrulaması yapar (Stripe-Signature) ve işlenmiş event
+// ID'leri processed_webhook_events tablosunda tutularak tekrar işleme
+// engellenir." Alan adları spec'te verilmediği için amaca uygun asgari şema.
+model ProcessedWebhookEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  provider    String   @db.VarChar(20)
+  eventId     String   @map("event_id") @db.VarChar(255)
+  eventType   String   @map("event_type") @db.VarChar(120)
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  // Aynı sağlayıcıdan aynı event_id iki kez işlenemez — replay/duplicate
+  // webhook teslimatına karşı asıl koruma burada.
+  @@unique([provider, eventId])
+  @@map("processed_webhook_events")
+}
