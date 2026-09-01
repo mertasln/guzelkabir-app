@@ -373,6 +373,26 @@ spec §12.2: task list/detail viewable offline, photos captured offline queue an
 
 ---
 
+## 6.14 Admin Panel (apps/admin) — ADIM 9, spec §11, in progress
+
+Own full sprint per explicit user decision (not opened piecemeal). Spec §18.3 only time-boxes 2 of §11.1's 7 modules (Sipariş Yönetimi + Atama Ekranı) — the rest (Partner/Şikayet/KPI/Kullanıcı-Rol/Mezarlık) are sequenced here by actual need.
+
+**Stack (verified directly against spec §3's PDF table, not inferred):** `apps/admin` — React 19 + Vite + TanStack Query + TanStack Table (Admin Panel's own row) + Tailwind CSS + shadcn/ui (spec §3's separate, project-wide "UI Kit" row — not app-specific). Port 3003, ops_manager/support_agent/admin only.
+
+**⚠️ Tracked spec deviation:** KPI Dashboard uses native Recharts only, not spec's "Metabase embed veya native chart" option — a separate BI tool's hosting is unneeded complexity at pilot scale. Revisit if real multi-user/self-service reporting need emerges post-pilot.
+
+**Real-time updates: 30s TanStack Query polling, not Socket.io** (spec offers both) — simpler, no connection-management layer, kept swappable in one place.
+
+**§11.2 "onay modalı" + audit_log — two independent guarantees:** backend already writes `audit_log` unconditionally on every critical mutation (can't be bypassed by a frontend bug); frontend's `useConfirmedMutation` hook (Phase 3 infra) owns both the confirm-modal and the actual API call so screens can't skip the modal by accident.
+
+**Phase 1 (`fb8c4ee`) done:** resolves the tracked onboarding→active blocker for real — `POST /partners/:id/approve`/`reject`, `GET /partners`, `GET /partners/:id/payouts`, plus `AuditLogService` (the `audit_log` table existed since the original schema, never had a writer until now). New `rejected` FieldPartnerStatus (migration, user decision). Support Agent's spec §19 refund limit has no numeric value in spec — MVP1 requires full ops/admin approval for any real refund rather than inventing a threshold.
+
+**Phase 2 (`aa7ee20`) done:** all order status transitions (assign/start/complete/approve/dispute + SLA auto-cancel/auto-close) now audit-logged too — `GET /orders/:id/audit` (timeline), `partnerId` filter on `GET /orders`.
+
+**Reminder for Phase 8 (Mezarlık & İzin Yönetimi), noted now:** extend the existing `PATCH /cemeteries/:id` (ADIM 7) with `permitStatus`/`permitDocumentUrl` — do not add a second cemetery-update endpoint.
+
+Both phases verified against real Postgres (40/40 e2e), full monorepo lint/typecheck/build clean. `apps/admin` frontend itself starts at Phase 3.
+
 ## 7. Deployment workflow
 
 No hosting/deploy integration is set up for this repo yet. Deployment targets (frontend, API, DB, object storage) land as part of the infra/DevOps step (spec §13).
