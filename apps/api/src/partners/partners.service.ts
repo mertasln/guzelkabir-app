@@ -53,6 +53,25 @@ export type PartnerListItem = Prisma.FieldPartnerGetPayload<{
   select: typeof PARTNER_LIST_SELECT;
 }>;
 
+// approve()/reject()/submitOnboarding() için: user join'i olmayan, aynı
+// prensip (nationalIdEncrypted asla dışarı verilmez) uygulanan daha dar bir
+// select. Kullanıcı talebi üzerine bulunan boşluk: bu üçü de daha önce
+// select'siz update()/upsert() sonucunu doğrudan döndürüyordu.
+const PARTNER_SAFE_SELECT = {
+  id: true,
+  userId: true,
+  criminalRecordCheck: true,
+  documentUrl: true,
+  insurancePolicyNo: true,
+  serviceCities: true,
+  ratingAvg: true,
+  status: true,
+  contractSignedAt: true,
+  ethicsTrainingCompletedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.FieldPartnerSelect;
+
 @Injectable()
 export class PartnersService {
   constructor(
@@ -119,6 +138,7 @@ export class PartnersService {
     const updated = await this.prisma.fieldPartner.update({
       where: { id: partnerId },
       data: { status: 'active' },
+      select: PARTNER_SAFE_SELECT,
     });
     await this.auditLog.record({
       actorId: actor.sub,
@@ -151,6 +171,7 @@ export class PartnersService {
     const updated = await this.prisma.fieldPartner.update({
       where: { id: partnerId },
       data: { status: 'rejected' },
+      select: PARTNER_SAFE_SELECT,
     });
     await this.auditLog.record({
       actorId: actor.sub,
@@ -219,6 +240,7 @@ export class PartnersService {
         insurancePolicyNo: dto.insurancePolicyNo,
         serviceCities: dto.serviceCities,
       },
+      select: PARTNER_SAFE_SELECT,
     });
   }
 }

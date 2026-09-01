@@ -143,6 +143,11 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
     });
     expect(stored?.nationalIdEncrypted).not.toBe('98765432109');
     expect(stored?.nationalIdEncrypted).toContain('.');
+
+    // Admin Panel Phase 4'te bulunan gerçek boşluk: bu response daha önce
+    // nationalIdEncrypted'ı (şifreli olsa bile) doğrudan içeriyordu —
+    // gereksiz bir sunucu-dışı ifşa. Regresyon kilidi.
+    expect(res.body).not.toHaveProperty('nationalIdEncrypted');
   });
 
   it('creates and cancels a subscription', async () => {
@@ -321,6 +326,7 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
       const body = ok.body as { items: Array<{ id: string; status: string }> };
       expect(body.items.some((p) => p.id === partner.id)).toBe(true);
       expect(body.items.every((p) => p.status === 'onboarding')).toBe(true);
+      expect(body.items.every((p) => !('nationalIdEncrypted' in p))).toBe(true);
     });
 
     it('POST /partners/:id/approve moves onboarding -> active and writes audit_log', async () => {
@@ -338,6 +344,7 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
         .set('Authorization', `Bearer ${opsToken}`);
       expect(ok.status).toBe(200);
       expect((ok.body as { status: string }).status).toBe('active');
+      expect(ok.body).not.toHaveProperty('nationalIdEncrypted');
 
       const reapprove = await request(server)
         .post(`/api/v1/partners/${partner.id}/approve`)
@@ -369,6 +376,7 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
         .send({ reason: 'Sabıka kaydı belgesi eksik/geçersiz.' });
       expect(ok.status).toBe(200);
       expect((ok.body as { status: string }).status).toBe('rejected');
+      expect(ok.body).not.toHaveProperty('nationalIdEncrypted');
 
       const logs = await prisma.auditLog.findMany({
         where: { entityId: partner.id, action: 'partner.reject' },
