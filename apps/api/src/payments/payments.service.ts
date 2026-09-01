@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IYZICO_CLIENT } from './iyzico.constants';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 import { AccessTokenPayload } from '../auth/types/jwt-payload.type';
+import { AuditLogService } from '../common/audit-log/audit-log.service';
 
 type CheckoutFormInitializeResult = {
   status: string;
@@ -50,6 +51,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(IYZICO_CLIENT) private readonly iyzico: Iyzipay,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   // identityNumber (TC Kimlik No/pasaport) hiçbir hata mesajına, log satırına
@@ -448,9 +450,25 @@ export class PaymentsService {
       data: { status: paymentStatus },
     });
     if (paymentStatus === 'succeeded') {
-      await this.prisma.order.update({
+      const order = await this.prisma.order.update({
         where: { id: payment.orderId },
         data: { status: 'confirmed' },
+      });
+      // Admin Panel ADIM 9 Phase 9 (KPI Dashboard) ile bulunan gerçek boşluk:
+      // bu geçiş (pending_payment→confirmed) hiçbir zaman audit_log'a
+      // yazılmıyordu — spec §17'nin 30 dk atama SLA'sı "confirmed'e ne zaman
+      // geçti" bilgisi olmadan hesaplanamazdı. Diğer SLA sweep'leriyle
+      // (SlaService) aynı desen: actorId=null/actorRole='system', çünkü bu
+      // geçiş bir insan aksiyonu değil, iyzico webhook/callback'i tarafından
+      // tetikleniyor.
+      await this.auditLog.record({
+        actorId: undefined,
+        actorRole: 'system',
+        action: 'order.confirm',
+        entityType: 'order',
+        entityId: order.id,
+        oldValue: { status: 'pending_payment' },
+        newValue: { status: 'confirmed' },
       });
     }
   }

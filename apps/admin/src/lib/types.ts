@@ -184,3 +184,17 @@ export type CemeteryAdminItem = {
   createdAt: string;
   updatedAt: string;
 };
+
+// apps/api/src/kpi/kpi.service.ts'in getDashboard() dönüşüyle eşleşir.
+export type KpiDashboard = {
+  ordersByStatus: Partial<Record<OrderStatus, number>>;
+  averageOrderValue: string | null;
+  totalRevenue: string | null;
+  complaintRate: number | null;
+  repeatCustomerRate: number | null;
+  averageAssignmentSlaMinutes: number | null;
+  orderLifecycleFunnel: Array<{ stage: OrderStatus; count: number }>;
+  // Gerçek bir üst-huni (site ziyaretçisi → sipariş) hiçbir yerde
+  // izlenmiyor — bkz. kpi.service.ts. Her zaman null.
+  conversionFunnel: null;
+};

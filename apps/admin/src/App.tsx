@@ -4,7 +4,6 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import { LoginPage } from "@/pages/LoginPage";
 import { DashboardPage } from "@/pages/DashboardPage";
-import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import { PartnersPage } from "@/pages/PartnersPage";
 import { OrdersPage } from "@/pages/OrdersPage";
 import { OrderDetailPage } from "@/pages/OrderDetailPage";
@@ -12,10 +11,12 @@ import { AssignmentPage } from "@/pages/AssignmentPage";
 import { ComplaintsPage } from "@/pages/ComplaintsPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { CemeteriesPage } from "@/pages/CemeteriesPage";
+import { KpiDashboardPage } from "@/pages/KpiDashboardPage";
 
-// spec §11.1'in 7 modülü. Sıra (bkz. CLAUDE.md "Admin Panel" bölümü, faz
-// planı): Phase 4 Partner Yönetimi, Phase 5 Sipariş/Atama, Phase 6 Şikayet,
-// Phase 7 Kullanıcı/Rol, Phase 8 Mezarlık/İzin, Phase 9 KPI Dashboard.
+// spec §11.1'in 7 modülü, hepsi ADIM 9 boyunca tamamlandı (bkz. CLAUDE.md
+// "Admin Panel" bölümü): Phase 4 Partner Yönetimi, Phase 5 Sipariş/Atama,
+// Phase 6 Şikayet, Phase 7 Kullanıcı/Rol, Phase 8 Mezarlık/İzin,
+// Phase 9 KPI Dashboard.
 export default function App() {
   return (
     <AuthProvider>
@@ -36,7 +37,7 @@ export default function App() {
           <Route path="sikayetler" element={<ComplaintsPage />} />
           <Route path="kullanicilar" element={<UsersPage />} />
           <Route path="mezarliklar" element={<CemeteriesPage />} />
-          <Route path="kpi" element={<PlaceholderPage title="KPI Dashboard" />} />
+          <Route path="kpi" element={<KpiDashboardPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

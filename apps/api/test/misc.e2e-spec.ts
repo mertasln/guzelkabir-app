@@ -127,8 +127,121 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`);
     expect(ok.status).toBe(200);
     expect(ok.body).toHaveProperty('ordersByStatus');
-    // Olay izleme altyapısı olmadan hesaplanamayan metrikler dürüstçe null (bkz. kpi.service.ts)
+    // Gerçek bir üst-huni (site ziyaretçisi → sipariş) hiçbir yerde
+    // izlenmiyor — bkz. kpi.service.ts, dürüstçe null.
     expect((ok.body as KpiResponseBody).conversionFunnel).toBeNull();
+  });
+
+  // Admin Panel, ADIM 9 Phase 9: spec §11.1'in daha önce yanlışlıkla
+  // "olay izleme gerektirir" diye null bırakılan iki metriği artık gerçekten
+  // hesaplanıyor.
+  it('GET /kpi/dashboard computes repeatCustomerRate, averageAssignmentSlaMinutes (from real audit_log timestamps), and orderLifecycleFunnel', async () => {
+    const repeatCustomer = await prisma.user.create({
+      data: {
+        email: 'kpi-repeat-cust@test.com',
+        passwordHash: 'x',
+        role: 'customer',
+        fullName: 'Repeat Cust',
+        locale: 'tr',
+      },
+    });
+    await prisma.order.createMany({
+      data: [
+        {
+          orderNumber: '#MB-KPI-00001',
+          customerId: repeatCustomer.id,
+          graveLocationId,
+          serviceType: 'cleaning',
+          status: 'draft',
+          priceAmount: 850,
+          currency: 'TRY',
+        },
+        {
+          orderNumber: '#MB-KPI-00002',
+          customerId: repeatCustomer.id,
+          graveLocationId,
+          serviceType: 'cleaning',
+          status: 'closed',
+          priceAmount: 850,
+          currency: 'TRY',
+        },
+      ],
+    });
+
+    // audit_log'a gerçek zaman damgalarıyla elle yazılıyor — bu test, tam
+    // ödeme webhook akışını değil (bkz. payments.e2e-spec.ts), KpiService'in
+    // audit_log'dan doğru SÜRE hesapladığını doğruluyor.
+    const slaOrder = await prisma.order.create({
+      data: {
+        orderNumber: '#MB-KPI-00003',
+        customerId: repeatCustomer.id,
+        graveLocationId,
+        serviceType: 'cleaning',
+        status: 'assigned',
+        priceAmount: 850,
+        currency: 'TRY',
+      },
+    });
+    const confirmedAt = new Date(Date.now() - 20 * 60 * 1000);
+    const assignedAt = new Date(Date.now() - 5 * 60 * 1000); // 15 dk sonra
+    await prisma.auditLog.createMany({
+      data: [
+        {
+          actorRole: 'system',
+          action: 'order.confirm',
+          entityType: 'order',
+          entityId: slaOrder.id,
+          oldValue: { status: 'pending_payment' },
+          newValue: { status: 'confirmed' },
+          createdAt: confirmedAt,
+        },
+        {
+          actorRole: 'ops_manager',
+          action: 'order.assign',
+          entityType: 'order',
+          entityId: slaOrder.id,
+          oldValue: { status: 'confirmed' },
+          newValue: { status: 'assigned' },
+          createdAt: assignedAt,
+        },
+      ],
+    });
+
+    const res = await request(server)
+      .get('/api/v1/kpi/dashboard')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    const body = res.body as {
+      repeatCustomerRate: number;
+      averageAssignmentSlaMinutes: number;
+      orderLifecycleFunnel: Array<{ stage: string; count: number }>;
+    };
+
+    expect(body.repeatCustomerRate).toBeGreaterThan(0);
+
+    expect(body.averageAssignmentSlaMinutes).toBeGreaterThanOrEqual(14.9);
+    expect(body.averageAssignmentSlaMinutes).toBeLessThanOrEqual(15.1);
+
+    const stages = body.orderLifecycleFunnel.map((s) => s.stage);
+    expect(stages).toEqual([
+      'draft',
+      'pending_payment',
+      'confirmed',
+      'assigned',
+      'in_progress',
+      'completed_pending_approval',
+      'closed',
+    ]);
+    // Kümülatif huni: her aşama bir öncekinden büyük olamaz.
+    for (let i = 1; i < body.orderLifecycleFunnel.length; i++) {
+      expect(body.orderLifecycleFunnel[i].count).toBeLessThanOrEqual(
+        body.orderLifecycleFunnel[i - 1].count,
+      );
+    }
+    const draftStage = body.orderLifecycleFunnel.find(
+      (s) => s.stage === 'draft',
+    );
+    expect(draftStage?.count).toBeGreaterThanOrEqual(3); // en az az yukarıda oluşturulan 3 sipariş
   });
 
   it('POST /partners/onboarding encrypts the national ID at rest (spec §14.1)', async () => {

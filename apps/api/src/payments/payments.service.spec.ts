@@ -3,6 +3,12 @@ import { BadRequestException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { IYZICO_CLIENT } from './iyzico.constants';
+import { AuditLogService } from '../common/audit-log/audit-log.service';
+
+// Bu testler finalizePayment'a (dolayısıyla audit_log yazımına) hiç
+// dokunmuyor — gerçek AuditLogService yerine boş bir mock yeterli, NestJS
+// yalnızca constructor'ın çözülebilmesi için gerektiriyor.
+const auditLogMock = { record: jest.fn().mockResolvedValue(undefined) };
 
 /**
  * identityNumber (TC Kimlik No/pasaport) hiçbir hata mesajına sızmamalı —
@@ -45,6 +51,7 @@ describe('PaymentsService — identityNumber redaction', () => {
         PaymentsService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: IYZICO_CLIENT, useValue: iyzicoMock },
+        { provide: AuditLogService, useValue: auditLogMock },
       ],
     }).compile();
 
@@ -185,6 +192,7 @@ describe('PaymentsService — refund()', () => {
         PaymentsService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: IYZICO_CLIENT, useValue: iyzicoMock },
+        { provide: AuditLogService, useValue: auditLogMock },
       ],
     }).compile();
 
@@ -230,6 +238,7 @@ describe('PaymentsService — refund()', () => {
             refund: { create: jest.fn() },
           },
         },
+        { provide: AuditLogService, useValue: auditLogMock },
       ],
     }).compile();
     const service = moduleRef.get(PaymentsService);
