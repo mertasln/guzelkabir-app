@@ -7,6 +7,12 @@ type ConfirmedMutationOptions<TData, TVariables> = UseMutationOptions<TData, Err
   description: string | ((variables: TVariables) => string);
   confirmLabel?: string;
   variant?: ConfirmOptions["variant"];
+  // Bazı aksiyonlar (örn. partner reddi) modal içinde bir metin girişi ister
+  // (spec §11.1: red gerekçesi). `field`, girilen değerin `variables`
+  // nesnesinde hangi anahtara yazılacağını belirtir — çağıran taraf o alanı
+  // boş geçer (örn. `{ partnerId, reason: "" }`), onay modalı girilen
+  // değerle doldurur.
+  input?: { field: keyof TVariables; label: string; placeholder?: string; required?: boolean };
 };
 
 // spec §11.2'nin "onay modalı" gereksinimini yapısal olarak zorunlu kılan
@@ -20,24 +26,29 @@ export function useConfirmedMutation<TData, TVariables>(
   options: ConfirmedMutationOptions<TData, TVariables>,
 ) {
   const confirm = useConfirm();
-  const { title, description, confirmLabel, variant, ...mutationOptions } = options;
+  const { title, description, confirmLabel, variant, input, ...mutationOptions } = options;
   const { mutate: _mutate, mutateAsync: _mutateAsync, ...rest } = useMutation(mutationOptions);
 
   const confirmedMutate = useCallback(
     (variables: TVariables) => {
       void (async () => {
-        const ok = await confirm({
+        const result = await confirm({
           title: typeof title === "function" ? title(variables) : title,
           description: typeof description === "function" ? description(variables) : description,
           confirmLabel,
           variant,
+          input: input
+            ? { label: input.label, placeholder: input.placeholder, required: input.required }
+            : undefined,
         });
-        if (ok) {
-          _mutate(variables);
-        }
+        if (!result.confirmed) return;
+        const finalVariables = input
+          ? { ...variables, [input.field]: result.value }
+          : variables;
+        _mutate(finalVariables);
       })();
     },
-    [confirm, title, description, confirmLabel, variant, _mutate],
+    [confirm, title, description, confirmLabel, variant, input, _mutate],
   );
 
   return { ...rest, confirmedMutate };

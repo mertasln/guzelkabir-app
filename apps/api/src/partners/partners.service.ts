@@ -28,8 +28,29 @@ export type TaskListItem = Prisma.OrderGetPayload<{
 // spec §11.1 "Partner Yönetimi" listesi ve kartları için — sipariş
 // ataması/görev ekranlarındaki TaskListItem'ın aksine burada partnerin kendi
 // User kaydı (fullName/email, ekranda göstermek için) join'lenir.
+//
+// Admin Panel Phase 4'te bulunan gerçek boşluk: `include` kullanmak TÜM
+// FieldPartner skaler alanlarını (nationalIdEncrypted dahil) döndürüyordu —
+// şifreli olsa bile, şifreli metnin tarayıcıya hiç gitmesi için bir neden
+// yok (defense in depth). Açık `select`e geçirildi.
+const PARTNER_LIST_SELECT = {
+  id: true,
+  userId: true,
+  criminalRecordCheck: true,
+  documentUrl: true,
+  insurancePolicyNo: true,
+  serviceCities: true,
+  ratingAvg: true,
+  status: true,
+  contractSignedAt: true,
+  ethicsTrainingCompletedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  user: { select: { fullName: true, email: true, phone: true } },
+} satisfies Prisma.FieldPartnerSelect;
+
 export type PartnerListItem = Prisma.FieldPartnerGetPayload<{
-  include: { user: { select: { fullName: true; email: true; phone: true } } };
+  select: typeof PARTNER_LIST_SELECT;
 }>;
 
 @Injectable()
@@ -54,9 +75,7 @@ export class PartnersService {
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      include: {
-        user: { select: { fullName: true, email: true, phone: true } },
-      },
+      select: PARTNER_LIST_SELECT,
     });
     const hasMore = items.length > limit;
     const page = hasMore ? items.slice(0, limit) : items;
