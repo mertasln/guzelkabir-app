@@ -391,7 +391,13 @@ Own full sprint per explicit user decision (not opened piecemeal). Spec §18.3 o
 
 **Reminder for Phase 8 (Mezarlık & İzin Yönetimi), noted now:** extend the existing `PATCH /cemeteries/:id` (ADIM 7) with `permitStatus`/`permitDocumentUrl` — do not add a second cemetery-update endpoint.
 
-Both phases verified against real Postgres (40/40 e2e), full monorepo lint/typecheck/build clean. `apps/admin` frontend itself starts at Phase 3.
+**Phase 3 (`12c7851`) done:** `apps/admin` scaffolded, `ProtectedRoute` role-gated, `ConfirmDialogProvider`/`useConfirmedMutation` built (raw `mutate` never exposed to screens). Live-verified: login, real name, nav, session-survives-reload, logout, both role-gate directions.
+
+**Phase 4 (`2e1f6b1` + fix in `beb2a2f`) done:** Partner Yönetimi screen (`DataTable` built here, reused everywhere after) — approve/reject via `useConfirmedMutation`, reject's reason collected through a new optional `input` field on the confirm modal. **Real bug found building this, then found 3 more times in the same file:** `PartnersService` used `include` instead of `select` on `findMany`/`approve`/`reject`/`submitOnboarding`, leaking the encrypted `nationalIdEncrypted` ciphertext into API responses that never needed it. Fixed all four with explicit selects + regression assertions in the e2e suite; grepped the rest of the codebase to confirm no other spot repeats it.
+
+**Phase 5 (`2a98abc`) done:** Sipariş Yönetimi (list + detail w/ audit-log timeline) + Atama Ekranı (pending orders + active partners side by side, one-click assign, live SLA countdown reusing `SlaService`'s existing `updated_at` proxy). Fixed a Phase 3 nav bug along the way — Sipariş Yönetimi and Atama Ekranı had been merged into one nav item; spec lists them as 2 of 7 modules. "Toplu işlem desteği" deliberately not built — spec never says which bulk actions are wanted, flagged rather than invented. Backend joins (customer/cemetery/partner) use the same explicit-select discipline as the Phase 4 fix.
+
+All five phases verified against real Postgres (40/40 e2e after each), full monorepo lint/typecheck/build clean throughout. Remaining: Phase 6 (Şikayet Yönetimi), Phase 7 (Kullanıcı & Rol Yönetimi), Phase 8 (Mezarlık & İzin Yönetimi), Phase 9 (KPI Dashboard UI).
 
 ## 7. Deployment workflow
 
