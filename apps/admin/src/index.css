@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Aynı tasarım token'ları apps/field-pwa ile paylaşılıyor — ikisi de spec
+   §3'ün paylaşılan "UI Kit" satırının (Tailwind + shadcn/ui) tüketicisi,
+   önceden var olan bir tasarımı korumuyorlar (apps/web'in aksine). */
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --primary: #1d4a3a;
+  --primary-foreground: #ffffff;
+  --border: #e2e8f0;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --destructive: #dc2626;
+  --success: #16a34a;
+  --warning: #d97706;
+  --sidebar: #0f2a21;
+  --sidebar-foreground: #f1f5f9;
+  --radius: 0.5rem;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+#root {
+  min-height: 100dvh;
+}
