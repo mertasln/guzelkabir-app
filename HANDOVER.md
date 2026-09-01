@@ -408,7 +408,9 @@ Own full sprint per explicit user decision (not opened piecemeal). Spec §18.3 o
 - `UsersService`: admin-only (spec §6.1's literal role table — Ops/Support don't have this authority) CRUD scoped strictly to `ops_manager`/`support_agent`/`admin` rows, password hash never selected, deactivate reuses the existing soft-delete convention, self-deactivation blocked server-side.
 - Live-verified: create → role change → deactivate → the account genuinely can't log in (checked against the real backend) → `ops_manager` blocked both server- and client-side with no data leak.
 
-All seven phases verified against real Postgres (50/50 e2e after Phase 7), full monorepo lint/typecheck/build clean throughout. Remaining: Phase 8 (Mezarlık & İzin Yönetimi), Phase 9 (KPI Dashboard UI).
+**Phase 8 (`4dfa3b7`) done** — `PATCH /cemeteries/:id` extended with `permitStatus`/`permitDocumentUrl` per explicit user instruction (no parallel update endpoint). Surfaced a real leak: the public `GET /cemeteries/search` had no `select`, returning every field including permit data — harmless while `permitDocumentUrl` was always null, a real leak once this phase gave it real values. Fixed with an explicit select (same pattern as the Phase 4 fix). Two genuinely new endpoints (not duplicating the update path): `POST /cemeteries` (creation never existed) and `GET /cemeteries` (admin-only full list, kept separate from the public search for the same security reason as the leak fix).
+
+All eight phases verified against real Postgres (54/54 e2e after Phase 8), full monorepo lint/typecheck/build clean throughout. Remaining: Phase 9 (KPI Dashboard UI) — the last phase of ADIM 9.
 
 ## 7. Deployment workflow
 
