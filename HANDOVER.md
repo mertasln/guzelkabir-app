@@ -410,7 +410,9 @@ Own full sprint per explicit user decision (not opened piecemeal). Spec §18.3 o
 
 **Phase 8 (`4dfa3b7`) done** — `PATCH /cemeteries/:id` extended with `permitStatus`/`permitDocumentUrl` per explicit user instruction (no parallel update endpoint). Surfaced a real leak: the public `GET /cemeteries/search` had no `select`, returning every field including permit data — harmless while `permitDocumentUrl` was always null, a real leak once this phase gave it real values. Fixed with an explicit select (same pattern as the Phase 4 fix). Two genuinely new endpoints (not duplicating the update path): `POST /cemeteries` (creation never existed) and `GET /cemeteries` (admin-only full list, kept separate from the public search for the same security reason as the leak fix).
 
-All eight phases verified against real Postgres (54/54 e2e after Phase 8), full monorepo lint/typecheck/build clean throughout. Remaining: Phase 9 (KPI Dashboard UI) — the last phase of ADIM 9.
+**Phase 9 (`f4d2e85`) done — final phase of ADIM 9.** Every spec §11.1 KPI was audited for real computability before coding: repeat-customer rate had been wrongly bundled as "needs event tracking" — it's a plain existing-schema aggregation, fixed for real. Average assignment SLA (spec §17's 30-min target) needed one missing `order.confirm` audit-log call in `PaymentsService.finalizePayment` — added, now genuinely real. True conversion funnel stays `null` correctly (no analytics infra anywhere in `apps/web`) — replaced with an honestly-labeled order-lifecycle funnel instead. `KpiDashboardPage` uses native Recharts. Live-verified via direct API call: a hand-seeded 20-minute audit-log gap produced exactly `averageAssignmentSlaMinutes: 20`.
+
+**All 9 phases of ADIM 9 (Admin Panel, spec §11) are complete** — verified against real Postgres (55/55 e2e after Phase 9), full monorepo lint/typecheck/build clean throughout every phase.
 
 ## 7. Deployment workflow
 
