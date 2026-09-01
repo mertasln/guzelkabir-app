@@ -8,6 +8,14 @@ on:
 jobs:
   lint-typecheck-build:
     runs-on: ubuntu-latest
+    # apps/api'nin postinstall'ı (prisma generate) schema.prisma'nın
+    # datasource url = env("DATABASE_URL") satırı yüzünden bu değişkenin
+    # TANIMLI olmasını istiyor — gerçek bir bağlantı kurmuyor, sadece
+    # client tiplerini üretiyor. Gerçek testler (apps/api/test/*.e2e-spec.ts)
+    # kendi embedded Postgres'ini kuruyor, bu CI job'ında hiç çalışmıyor —
+    # bu yüzden burada sahte bir değer yeterli.
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
 
