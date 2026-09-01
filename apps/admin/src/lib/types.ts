@@ -164,3 +164,23 @@ export type StaffUserItem = {
   updatedAt: string;
   deletedAt: string | null;
 };
+
+export type PermitStatus = "pending" | "approved" | "rejected";
+
+// apps/api/src/cemeteries/cemeteries.service.ts'in admin (izinsiz select
+// filtresi olmayan) Cemetery dönüşüyle eşleşir — GET /cemeteries/search'in
+// PublicCemetery'sinden farklı, permitStatus/permitDocumentUrl içerir.
+export type CemeteryAdminItem = {
+  id: string;
+  name: string;
+  city: string;
+  district: string;
+  municipalityAuthority: string;
+  permitStatus: PermitStatus;
+  permitDocumentUrl: string | null;
+  lat: string | null;
+  lng: string | null;
+  geotagToleranceM: number | null;
+  createdAt: string;
+  updatedAt: string;
+};

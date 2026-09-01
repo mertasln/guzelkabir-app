@@ -558,4 +558,146 @@ describe('Cemeteries / KPI / Partners / Subscriptions (e2e)', () => {
       expect(res.status).toBe(400);
     });
   });
+
+  // Admin Panel, ADIM 9 Phase 8: spec §11.1 "Mezarlık & İzin Yönetimi:
+  // Mezarlık kayıtları, belediye izin statüsü ve belge arşivi."
+  describe('Cemetery & permit management (Admin Panel, spec §11.1)', () => {
+    it('POST /cemeteries is ops/admin-only and creates a new cemetery record', async () => {
+      const forbidden = await request(server)
+        .post('/api/v1/cemeteries')
+        .set('Authorization', `Bearer ${custToken}`)
+        .send({
+          name: 'Forbidden Attempt Mezarlık',
+          city: 'İstanbul',
+          district: 'Kadıköy',
+          municipalityAuthority: 'İBB',
+        });
+      expect(forbidden.status).toBe(403);
+
+      const created = await request(server)
+        .post('/api/v1/cemeteries')
+        .set('Authorization', `Bearer ${opsToken}`)
+        .send({
+          name: 'Phase8 Yeni Mezarlık',
+          city: 'İzmir',
+          district: 'Konak',
+          municipalityAuthority: 'İzmir BB',
+        });
+      expect(created.status).toBe(201);
+      const createdBody = created.body as { id: string; permitStatus: string };
+      expect(createdBody.permitStatus).toBe('pending');
+
+      const logs = await prisma.auditLog.findMany({
+        where: { entityId: createdBody.id, action: 'cemetery.create' },
+      });
+      expect(logs.length).toBe(1);
+    });
+
+    it('GET /cemeteries is admin-only (distinct from public GET /cemeteries/search) and filters by permitStatus', async () => {
+      const created = await request(server)
+        .post('/api/v1/cemeteries')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Phase8 Filtre Mezarlık',
+          city: 'Ankara',
+          district: 'Çankaya',
+          municipalityAuthority: 'ABB',
+        });
+      const cemeteryId = (created.body as { id: string }).id;
+
+      const forbidden = await request(server)
+        .get('/api/v1/cemeteries')
+        .set('Authorization', `Bearer ${custToken}`);
+      expect(forbidden.status).toBe(403);
+
+      const list = await request(server)
+        .get('/api/v1/cemeteries')
+        .query({ permitStatus: 'pending' })
+        .set('Authorization', `Bearer ${opsToken}`);
+      expect(list.status).toBe(200);
+      const listBody = list.body as {
+        items: Array<{ id: string; permitStatus: string }>;
+      };
+      expect(listBody.items.some((c) => c.id === cemeteryId)).toBe(true);
+      expect(listBody.items.every((c) => c.permitStatus === 'pending')).toBe(
+        true,
+      );
+    });
+
+    it('PATCH /cemeteries/:id sets permitStatus/permitDocumentUrl (extends the existing endpoint, not a new one) and audit-logs the permit status change', async () => {
+      const created = await request(server)
+        .post('/api/v1/cemeteries')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Phase8 İzin Mezarlık',
+          city: 'Bursa',
+          district: 'Nilüfer',
+          municipalityAuthority: 'Bursa BB',
+        });
+      const cemeteryId = (created.body as { id: string }).id;
+
+      const updated = await request(server)
+        .patch(`/api/v1/cemeteries/${cemeteryId}`)
+        .set('Authorization', `Bearer ${opsToken}`)
+        .send({
+          permitStatus: 'approved',
+          permitDocumentUrl: 'https://example.com/izin-belgesi.pdf',
+        });
+      expect(updated.status).toBe(200);
+      const updatedBody = updated.body as {
+        permitStatus: string;
+        permitDocumentUrl: string;
+      };
+      expect(updatedBody.permitStatus).toBe('approved');
+      expect(updatedBody.permitDocumentUrl).toBe(
+        'https://example.com/izin-belgesi.pdf',
+      );
+
+      const logs = await prisma.auditLog.findMany({
+        where: {
+          entityId: cemeteryId,
+          action: 'cemetery.permit_status_change',
+        },
+      });
+      expect(logs.length).toBe(1);
+      expect(logs[0].oldValue).toEqual({ permitStatus: 'pending' });
+      expect(logs[0].newValue).toEqual({ permitStatus: 'approved' });
+
+      // geotagToleranceM (ADIM 7) hâlâ AYNI PATCH üzerinden çalışıyor —
+      // genişletme geriye dönük uyumluluğu bozmadı.
+      const toleranceUpdate = await request(server)
+        .patch(`/api/v1/cemeteries/${cemeteryId}`)
+        .set('Authorization', `Bearer ${opsToken}`)
+        .send({ geotagToleranceM: 200 });
+      expect(toleranceUpdate.status).toBe(200);
+      expect(
+        (toleranceUpdate.body as { geotagToleranceM: number }).geotagToleranceM,
+      ).toBe(200);
+    });
+
+    it('GET /cemeteries/search (public, unauthenticated) never exposes permitDocumentUrl', async () => {
+      const created = await request(server)
+        .post('/api/v1/cemeteries')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Phase8 Gizlilik Mezarlık',
+          city: 'İstanbul',
+          district: 'Şişli',
+          municipalityAuthority: 'İBB',
+        });
+      const cemeteryId = (created.body as { id: string }).id;
+      await request(server)
+        .patch(`/api/v1/cemeteries/${cemeteryId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ permitDocumentUrl: 'https://example.com/gizli-belge.pdf' });
+
+      const search = await request(server)
+        .get('/api/v1/cemeteries/search')
+        .query({ q: 'Phase8 Gizlilik' });
+      expect(search.status).toBe(200);
+      const body = search.body as { items: Array<Record<string, unknown>> };
+      expect(body.items.length).toBeGreaterThanOrEqual(1);
+      expect(body.items.every((c) => !('permitDocumentUrl' in c))).toBe(true);
+    });
+  });
 });
