@@ -13,6 +13,7 @@ import { IYZICO_CLIENT } from './iyzico.constants';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 import { AccessTokenPayload } from '../auth/types/jwt-payload.type';
 import { AuditLogService } from '../common/audit-log/audit-log.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type CheckoutFormInitializeResult = {
   status: string;
@@ -52,6 +53,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     @Inject(IYZICO_CLIENT) private readonly iyzico: Iyzipay,
     private readonly auditLog: AuditLogService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // identityNumber (TC Kimlik No/pasaport) hiçbir hata mesajına, log satırına
@@ -470,6 +472,21 @@ export class PaymentsService {
         oldValue: { status: 'pending_payment' },
         newValue: { status: 'confirmed' },
       });
+      // spec §9 satır 1 "Sipariş onaylandı" — E-posta + SMS.
+      const customer = await this.prisma.user.findUniqueOrThrow({
+        where: { id: order.customerId },
+        select: { fullName: true },
+      });
+      await this.notifications.notify(
+        order.customerId,
+        'order_confirmed',
+        {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          customerName: customer.fullName,
+        },
+        ['email', 'sms'],
+      );
     }
   }
 }

@@ -20,6 +20,9 @@ export class SlaProcessor extends WorkerHost {
       case 'escalate-overdue-assignments':
         await this.slaService.escalateOverdueAssignments();
         return;
+      case 'send-approval-reminders':
+        await this.slaService.sendApprovalReminders();
+        return;
       default:
         return;
     }

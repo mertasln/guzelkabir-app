@@ -51,6 +51,7 @@
     "iyzipay": "^2.0.69",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "postmark": "^4.0.5",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sharp": "^0.35.4"

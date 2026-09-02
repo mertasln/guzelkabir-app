@@ -175,6 +175,17 @@ describe('Complaints (e2e)', () => {
       'complaint.investigate',
       'complaint.resolve',
     ]);
+
+    // spec §9 satır 6 "Şikayet açıldı/çözüldü" — çözüm yarısı (E-posta + SMS).
+    const complaintResolvedNotifications = await prisma.notification.findMany({
+      where: {
+        templateKey: 'complaint_resolved',
+        payload: { path: ['orderId'], equals: complaint.orderId },
+      },
+    });
+    expect(complaintResolvedNotifications.map((n) => n.channel).sort()).toEqual(
+      ['email', 'sms'],
+    );
   });
 
   it('rejected outcome closes a disputed order (spec §21.2 disputed -> closed)', async () => {

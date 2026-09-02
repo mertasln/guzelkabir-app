@@ -4,11 +4,14 @@ import { PaymentsService } from './payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { IYZICO_CLIENT } from './iyzico.constants';
 import { AuditLogService } from '../common/audit-log/audit-log.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
-// Bu testler finalizePayment'a (dolayısıyla audit_log yazımına) hiç
-// dokunmuyor — gerçek AuditLogService yerine boş bir mock yeterli, NestJS
-// yalnızca constructor'ın çözülebilmesi için gerektiriyor.
+// Bu testler finalizePayment'a (dolayısıyla audit_log yazımına/bildirim
+// gönderimine) hiç dokunmuyor — gerçek AuditLogService/NotificationsService
+// yerine boş mock'lar yeterli, NestJS yalnızca constructor'ın
+// çözülebilmesi için gerektiriyor.
 const auditLogMock = { record: jest.fn().mockResolvedValue(undefined) };
+const notificationsMock = { notify: jest.fn().mockResolvedValue(undefined) };
 
 /**
  * identityNumber (TC Kimlik No/pasaport) hiçbir hata mesajına sızmamalı —
@@ -52,6 +55,7 @@ describe('PaymentsService — identityNumber redaction', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: IYZICO_CLIENT, useValue: iyzicoMock },
         { provide: AuditLogService, useValue: auditLogMock },
+        { provide: NotificationsService, useValue: notificationsMock },
       ],
     }).compile();
 
@@ -193,6 +197,7 @@ describe('PaymentsService — refund()', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: IYZICO_CLIENT, useValue: iyzicoMock },
         { provide: AuditLogService, useValue: auditLogMock },
+        { provide: NotificationsService, useValue: notificationsMock },
       ],
     }).compile();
 
@@ -239,6 +244,7 @@ describe('PaymentsService — refund()', () => {
           },
         },
         { provide: AuditLogService, useValue: auditLogMock },
+        { provide: NotificationsService, useValue: notificationsMock },
       ],
     }).compile();
     const service = moduleRef.get(PaymentsService);

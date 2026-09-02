@@ -150,6 +150,22 @@ describe('Orders (e2e)', () => {
       status: 'assigned',
       assignedPartnerId: partnerId,
     });
+
+    // spec §9 satır 2 "Saha atandı" — yalnızca WhatsApp tanımlı, WhatsApp bu
+    // fazda kasıtlı olarak ertelendi. Kullanıcı kararıyla e-posta fallback
+    // eklendi (WhatsApp gelene kadar müşteri hiç bilgilendirilmesin
+    // istenmedi, bkz. CLAUDE.md/templates.ts). WhatsApp satırı 'queued'
+    // yazılır ama hiçbir gerçek gönderim asla denenmez; e-posta satırı
+    // gerçek dispatch job'ı alır (bu sandbox'ta Redis erişilemediği için
+    // yine de 'queued' kalır — bkz. NotificationsService).
+    const notifications = await prisma.notification.findMany({
+      where: { userId: customerId, templateKey: 'field_assigned' },
+    });
+    expect(notifications.map((n) => n.channel).sort()).toEqual([
+      'email',
+      'whatsapp',
+    ]);
+    expect(notifications.every((n) => n.status === 'queued')).toBe(true);
   });
 
   it('enforces the assigned → in_progress → completed_pending_approval → closed chain (spec §21.2)', async () => {
@@ -222,6 +238,20 @@ describe('Orders (e2e)', () => {
     expect(completed.status).toBe(200);
     expect((completed.body as OrderResponseBody).status).toBe(
       'completed_pending_approval',
+    );
+
+    // spec §9 satır 3 "Görev tamamlandı" — E-posta + SMS + WhatsApp (WhatsApp
+    // ertelendi, aynı gerekçe). Üçü de bu tetikleyicide satır olarak yazılır.
+    const taskCompletedNotifications = await prisma.notification.findMany({
+      where: { userId: customerId, templateKey: 'task_completed' },
+    });
+    expect(taskCompletedNotifications.map((n) => n.channel).sort()).toEqual([
+      'email',
+      'sms',
+      'whatsapp',
+    ]);
+    expect(taskCompletedNotifications.every((n) => n.status === 'queued')).toBe(
+      true,
     );
 
     const approved = await request(server)
@@ -297,6 +327,15 @@ describe('Orders (e2e)', () => {
       where: { entityId: order.id, action: 'order.dispute' },
     });
     expect(logs.length).toBe(1);
+
+    // spec §9 satır 6 "Şikayet açıldı/çözüldü" — açılış yarısı (E-posta + SMS).
+    const complaintOpenedNotifications = await prisma.notification.findMany({
+      where: { userId: customerId, templateKey: 'complaint_opened' },
+    });
+    expect(complaintOpenedNotifications.map((n) => n.channel).sort()).toEqual([
+      'email',
+      'sms',
+    ]);
   });
 
   it('dedupes POST /orders when the same Idempotency-Key is reused (spec §5.1)', async () => {

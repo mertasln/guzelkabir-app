@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log/audit-log.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 // spec §11.1 "Sipariş Yönetimi: ... zaman çizelgesi/audit trail görünümü" —
 // SLA otomasyonu bir insan aksiyonu değil, actorId=null/actorRole='system'
@@ -11,6 +12,8 @@ const SYSTEM_ACTOR_ROLE = 'system';
 const PAYMENT_TIMEOUT_HOURS = 24;
 // spec §17: "30 dk içinde saha partnerine atama"
 const ASSIGNMENT_SLA_MINUTES = 30;
+// spec §9 satır 4: "48 saat onay hatırlatma (24. saatte)"
+const APPROVAL_REMINDER_HOURS = 24;
 
 @Injectable()
 export class SlaService {
@@ -19,6 +22,7 @@ export class SlaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -178,5 +182,54 @@ export class SlaService {
       `${overdue.length} sipariş 30 dk atama SLA'sını aştı, Ops'a eskalasyon bildirimi kuyruğa alındı.`,
     );
     return overdue.length;
+  }
+
+  /**
+   * spec §9 satır 4: "48 saat onay hatırlatma (24. saatte)" — yalnızca SMS.
+   * Onay penceresi (completedAt + 48s) başladıktan bu yana >= 24 saat geçmiş
+   * ve daha önce bu şablonla hatırlatılmamış siparişler için tek seferlik
+   * SMS. Dedup, diğer sweep'lerle (escalateOverdueAssignments) aynı desen:
+   * bu sweep periyodik tekrar çalıştığı için, mevcut bir Notification kaydı
+   * var mı kontrol edilmeden çağrılırsa her taramada yeniden gönderilirdi.
+   */
+  async sendApprovalReminders(): Promise<number> {
+    const cutoff = new Date(
+      Date.now() - APPROVAL_REMINDER_HOURS * 60 * 60 * 1000,
+    );
+    const dueForReminder = await this.prisma.order.findMany({
+      where: {
+        status: 'completed_pending_approval',
+        completedAt: { lte: cutoff },
+      },
+    });
+    if (dueForReminder.length === 0) {
+      return 0;
+    }
+
+    let remindedCount = 0;
+    for (const order of dueForReminder) {
+      const alreadyReminded = await this.prisma.notification.findFirst({
+        where: {
+          userId: order.customerId,
+          templateKey: 'approval_reminder_24h',
+          payload: { path: ['orderId'], equals: order.id },
+        },
+      });
+      if (!alreadyReminded) {
+        await this.notifications.notify(
+          order.customerId,
+          'approval_reminder_24h',
+          { orderId: order.id, orderNumber: order.orderNumber },
+          ['sms'],
+        );
+        remindedCount++;
+      }
+    }
+    if (remindedCount > 0) {
+      this.logger.log(
+        `${remindedCount} sipariş için 24 saatlik onay hatırlatma SMS'i kuyruğa alındı.`,
+      );
+    }
+    return remindedCount;
   }
 }

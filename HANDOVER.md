@@ -373,7 +373,7 @@ spec §12.2: task list/detail viewable offline, photos captured offline queue an
 
 ---
 
-## 6.14 Admin Panel (apps/admin) — ADIM 9, spec §11, in progress
+## 6.14 Admin Panel (apps/admin) — ADIM 9, spec §11, done (all 9 phases)
 
 Own full sprint per explicit user decision (not opened piecemeal). Spec §18.3 only time-boxes 2 of §11.1's 7 modules (Sipariş Yönetimi + Atama Ekranı) — the rest (Partner/Şikayet/KPI/Kullanıcı-Rol/Mezarlık) are sequenced here by actual need.
 
@@ -413,6 +413,24 @@ Own full sprint per explicit user decision (not opened piecemeal). Spec §18.3 o
 **Phase 9 (`f4d2e85`) done — final phase of ADIM 9.** Every spec §11.1 KPI was audited for real computability before coding: repeat-customer rate had been wrongly bundled as "needs event tracking" — it's a plain existing-schema aggregation, fixed for real. Average assignment SLA (spec §17's 30-min target) needed one missing `order.confirm` audit-log call in `PaymentsService.finalizePayment` — added, now genuinely real. True conversion funnel stays `null` correctly (no analytics infra anywhere in `apps/web`) — replaced with an honestly-labeled order-lifecycle funnel instead. `KpiDashboardPage` uses native Recharts. Live-verified via direct API call: a hand-seeded 20-minute audit-log gap produced exactly `averageAssignmentSlaMinutes: 20`.
 
 **All 9 phases of ADIM 9 (Admin Panel, spec §11) are complete** — verified against real Postgres (55/55 e2e after Phase 9), full monorepo lint/typecheck/build clean throughout every phase.
+
+## 6.15 Notifications (apps/api/src/notifications, src/sla) — spec §9, ADIM 10, SMS+email done, WhatsApp deferred
+
+Real SMS (Netgsm) + e-posta (Postmark) delivery for spec §9's 5 customer-facing triggers, wired into a new event-driven BullMQ dispatcher. Scope deliberately narrowed by user decision: of spec §3's Netgsm+Twilio dual SMS provider, only Netgsm (TR) — Twilio (diaspora/international) deferred to MVP2; of "Postmark veya SendGrid", Postmark; **WhatsApp entirely deferred** (Meta Business verification + pre-approved template messages is a separate, slow process, not a code risk) — see CLAUDE.md's Notifications section for the full spec-research citations and per-trigger detail.
+
+**Architecture:** `NotificationsModule` (`@Global`) registers its own BullMQ Redis connection (same `maxRetriesPerRequest: null` reasoning as `SlaModule`) but under a **named `configKey`** (`'notifications'`) rather than repeating `SlaModule`'s unnamed `forRootAsync` call — calling it twice unnamed would double-register the same global provider token. `NotificationsService.notify(userId, templateKey, payload, channels)` writes one `Notification` row per channel (matches the existing schema); only `sms`/`email` channels get a BullMQ dispatch job added — `whatsapp`/`push` rows stay honestly `'queued'` with no job, no fake "sent" behavior. `NotificationsProcessor` renders the row via `templates.ts` and calls `SmsService`/`EmailService`, marking `'failed'` only on BullMQ's last retry attempt (5 attempts, exponential backoff).
+
+**Redis-unavailable safety, load-bearing:** since BullMQ's Redis connection is unreachable in this sandbox and in every e2e test (only the shared `REDIS_CLIENT` is mocked, not BullMQ's own connection), `notify()` wraps `queue.add()` in try/catch — a notification enqueue failure must never fail the underlying order/payment/complaint operation. Rows stay `'queued'` with no automatic retry once Redis comes back — a known, tracked gap, same category as the standing "not verified against real Redis" caveat on Auth/SLA.
+
+**5 trigger points:** order confirmed (`PaymentsService.finalizePayment`), field assigned (`OrdersService.assign`, WhatsApp+email — see below), task completed (`OrdersService.complete`, email+sms+whatsapp), 24h approval reminder (new `SlaService.sendApprovalReminders()`, a new 15-min BullMQ sweep alongside the existing SLA sweeps), complaint opened/resolved (`OrdersService.addComplaint` / `ComplaintsService.resolve`).
+
+**⚠️ Field-assigned flagged gap, resolved with an explicit spec deviation:** spec §9's table names only WhatsApp for "Saha atandı." With WhatsApp deferred, that would leave this trigger fully silent — the customer gets zero notification when a caretaker is assigned. User caught this and chose an email fallback (`templates.ts`'s `field_assigned` entry, `notify()` called with `['whatsapp', 'email']`) over leaving it silently flagged — the WhatsApp row still stays `'queued'`/never dispatched, but email now goes out for real. Revisit whether the fallback should stay once WhatsApp is actually built.
+
+**Netgsm's contract was hand-verified from source** (no official Node SDK exists) — REST v2 JSON API, HTTP Basic Auth, real JSON response (`{code, id, description}`), cross-checked against the official `netgsm` GitHub org's Python SDK plus an independent web search. Postmark uses the official `postmark` npm SDK.
+
+**Verified for real:** no live provider keys exist yet (user adds them, same protocol as iyzico/AWS), so an actual send was not attempted this ADIM — but the production side (correct row per trigger, correct channel/template/status) was verified end-to-end against a real (temporary, embedded) Postgres: new assertions added to `orders.e2e-spec.ts`/`payments.e2e-spec.ts`/`complaints.e2e-spec.ts`/`sla.e2e-spec.ts` covering all 5 triggers. 56/56 e2e + 15/15 unit tests green, full monorepo lint/typecheck/build clean.
+
+**Not yet done:** WhatsApp, Twilio, a real send with live provider keys, and a recovery mechanism for rows stuck `'queued'` after a Redis outage. The two Ops-internal `channel='push'` notifications (SLA assignment escalation, evidence manual-review) are still queue-only — no push infra exists, out of this ADIM's scope (spec §9's table only covers the 6 customer-facing rows).
 
 ## 7. Deployment workflow
 

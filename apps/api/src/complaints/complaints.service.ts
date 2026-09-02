@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit-log/audit-log.service';
 import { PaymentsService } from '../payments/payments.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ListComplaintsQueryDto } from './dto/list-complaints-query.dto';
 import { ResolveComplaintDto } from './dto/resolve-complaint.dto';
 import { AccessTokenPayload } from '../auth/types/jwt-payload.type';
@@ -43,6 +44,7 @@ export class ComplaintsService {
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
     private readonly payments: PaymentsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async findMany(
@@ -149,11 +151,29 @@ export class ComplaintsService {
     //
     // resolved_refund: order durumu processRefund()'da değişir, BURADA
     // DEĞİL — gerçek iade henüz gerçekleşmedi.
+    const order = await this.prisma.order.findUniqueOrThrow({
+      where: { id: complaint.orderId },
+      select: { id: true, orderNumber: true, customerId: true, status: true },
+    });
+    const customer = await this.prisma.user.findUniqueOrThrow({
+      where: { id: order.customerId },
+      select: { fullName: true },
+    });
+    // spec §9 satır 6 "Şikayet açıldı/çözüldü" — çözüm yarısı. Açılış yarısı
+    // OrdersService.addComplaint'te.
+    await this.notifications.notify(
+      order.customerId,
+      'complaint_resolved',
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerName: customer.fullName,
+      },
+      ['email', 'sms'],
+    );
+
     if (dto.outcome === 'rejected') {
-      const order = await this.prisma.order.findUnique({
-        where: { id: complaint.orderId },
-      });
-      if (order?.status === 'disputed') {
+      if (order.status === 'disputed') {
         await this.prisma.order.update({
           where: { id: order.id },
           data: { status: 'closed' },

@@ -64,6 +64,13 @@ export class SlaModule implements OnModuleInit {
         { pattern: '*/15 * * * *' },
         { name: 'auto-close-approved-orders' },
       );
+      // spec §9 satır 4: "48 saat onay hatırlatma (24. saatte)" — spec kontrol
+      // sıklığını belirtmiyor, yukarıdaki 15 dk'lık varsayımla tutarlı.
+      await this.queue.upsertJobScheduler(
+        'send-approval-reminders',
+        { pattern: '*/15 * * * *' },
+        { name: 'send-approval-reminders' },
+      );
     } catch (err) {
       // Redis erişilemezse uygulamanın tamamı açılamamamalı — SLA otomasyonu
       // olmadan da API'nin geri kalanı (auth, orders, vb.) çalışabilmeli.

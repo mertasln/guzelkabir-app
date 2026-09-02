@@ -26,6 +26,7 @@ import {
 } from '../common/pagination/cursor-pagination.type';
 import { AccessTokenPayload } from '../auth/types/jwt-payload.type';
 import { AuditLogService } from '../common/audit-log/audit-log.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const APPROVAL_WINDOW_HOURS = 48;
 // spec §8.2: "Minimum 2 fotoğraf: 1 geniş açı (mezar ve çevresi), 1 detay çekimi"
@@ -96,6 +97,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly auditLog: AuditLogService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // spec §11.1 "Sipariş Yönetimi: sipariş detay sayfası (zaman
@@ -290,6 +292,26 @@ export class OrdersService {
       oldValue: { status: order.status, assignedPartnerId: null },
       newValue: { status: updated.status, assignedPartnerId: partner.id },
     });
+    // spec §9 satır 2 "Saha atandı" — yalnızca WhatsApp kanalı tanımlı,
+    // WhatsApp bu fazda kasıtlı olarak ertelendi (bkz. templates.ts). Bu
+    // durumda müşteri hiçbir bildirim almazdı — kullanıcı kararıyla e-posta
+    // fallback eklendi (spec §9 satır 2'nin literal WhatsApp-only
+    // tanımından kasıtlı, işaretli bir sapma — bkz. templates.ts'in
+    // field_assigned yorumu).
+    const assignedCustomer = await this.prisma.user.findUniqueOrThrow({
+      where: { id: updated.customerId },
+      select: { fullName: true },
+    });
+    await this.notifications.notify(
+      updated.customerId,
+      'field_assigned',
+      {
+        orderId: updated.id,
+        orderNumber: updated.orderNumber,
+        customerName: assignedCustomer.fullName,
+      },
+      ['whatsapp', 'email'],
+    );
     return updated;
   }
 
@@ -498,6 +520,23 @@ export class OrdersService {
       oldValue: { status: order.status },
       newValue: { status: updated.status, approvalDeadline },
     });
+    // spec §9 satır 3 "Görev tamamlandı" — E-posta + SMS + WhatsApp. WhatsApp
+    // bu fazda kasıtlı olarak ertelendi (bkz. templates.ts), satırı yine de
+    // 'queued' olarak yazılıyor.
+    const customer = await this.prisma.user.findUniqueOrThrow({
+      where: { id: updated.customerId },
+      select: { fullName: true },
+    });
+    await this.notifications.notify(
+      updated.customerId,
+      'task_completed',
+      {
+        orderId: updated.id,
+        orderNumber: updated.orderNumber,
+        customerName: customer.fullName,
+      },
+      ['email', 'sms', 'whatsapp'],
+    );
     return updated;
   }
 
@@ -608,6 +647,22 @@ export class OrdersService {
         newValue: { status: 'disputed', complaintId: complaint.id },
       });
     }
+    // spec §9 satır 6 "Şikayet açıldı/çözüldü" — E-posta + SMS (açılış yarısı;
+    // çözüm yarısı ComplaintsService.resolve'da).
+    const customer = await this.prisma.user.findUniqueOrThrow({
+      where: { id: order.customerId },
+      select: { fullName: true },
+    });
+    await this.notifications.notify(
+      order.customerId,
+      'complaint_opened',
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerName: customer.fullName,
+      },
+      ['email', 'sms'],
+    );
     return complaint;
   }
 

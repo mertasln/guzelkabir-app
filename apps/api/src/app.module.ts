@@ -20,6 +20,7 @@ import { SlaModule } from './sla/sla.module';
 import { GraveLocationsModule } from './grave-locations/grave-locations.module';
 import { UsersModule } from './users/users.module';
 import { ComplaintsModule } from './complaints/complaints.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ComplaintsModule } from './complaints/complaints.module';
     GraveLocationsModule,
     UsersModule,
     ComplaintsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

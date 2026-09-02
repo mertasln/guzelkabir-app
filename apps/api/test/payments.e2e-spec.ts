@@ -148,6 +148,15 @@ describe('Payments (e2e)', () => {
     expect(updatedOrder?.status).toBe('confirmed');
     expect(updatedPayment?.status).toBe('succeeded');
 
+    // spec §9 satır 1 "Sipariş onaylandı" — E-posta + SMS.
+    const orderConfirmedNotifications = await prisma.notification.findMany({
+      where: { userId: customer.id, templateKey: 'order_confirmed' },
+    });
+    expect(orderConfirmedNotifications.map((n) => n.channel).sort()).toEqual([
+      'email',
+      'sms',
+    ]);
+
     // Replay: the exact same event delivered again must not be reprocessed.
     const replay = await request(server)
       .post(WEBHOOK_PATH)

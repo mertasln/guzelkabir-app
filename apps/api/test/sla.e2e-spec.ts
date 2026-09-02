@@ -218,4 +218,65 @@ describe('SLA sweeps (e2e)', () => {
     });
     expect(notificationsAfter.length).toBe(1);
   });
+
+  it('sends a 24h approval reminder SMS and does not duplicate it on re-sweep (spec §9 satır 4)', async () => {
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: '#MB-SLA-REMIND-OLD',
+        customerId,
+        graveLocationId,
+        serviceType: 'cleaning',
+        status: 'completed_pending_approval',
+        assignedPartnerId: partnerId,
+        priceAmount: 850,
+        currency: 'TRY',
+        completedAt: new Date(Date.now() - 25 * 60 * 60 * 1000), // >24h ago
+        approvalDeadline: new Date(Date.now() + 23 * 60 * 60 * 1000),
+      },
+    });
+    const recent = await prisma.order.create({
+      data: {
+        orderNumber: '#MB-SLA-REMIND-NEW',
+        customerId,
+        graveLocationId,
+        serviceType: 'cleaning',
+        status: 'completed_pending_approval',
+        assignedPartnerId: partnerId,
+        priceAmount: 850,
+        currency: 'TRY',
+        completedAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1h ago, not due yet
+        approvalDeadline: new Date(Date.now() + 47 * 60 * 60 * 1000),
+      },
+    });
+
+    const count = await slaService.sendApprovalReminders();
+    expect(count).toBeGreaterThanOrEqual(1);
+
+    const dueNotifications = await prisma.notification.findMany({
+      where: {
+        templateKey: 'approval_reminder_24h',
+        payload: { path: ['orderId'], equals: order.id },
+      },
+    });
+    expect(dueNotifications.length).toBe(1);
+    expect(dueNotifications[0].channel).toBe('sms');
+
+    const notDueNotifications = await prisma.notification.findMany({
+      where: {
+        templateKey: 'approval_reminder_24h',
+        payload: { path: ['orderId'], equals: recent.id },
+      },
+    });
+    expect(notDueNotifications.length).toBe(0);
+
+    // Re-sweep must not create a duplicate reminder for the same order.
+    await slaService.sendApprovalReminders();
+    const dueNotificationsAfter = await prisma.notification.findMany({
+      where: {
+        templateKey: 'approval_reminder_24h',
+        payload: { path: ['orderId'], equals: order.id },
+      },
+    });
+    expect(dueNotificationsAfter.length).toBe(1);
+  });
 });
