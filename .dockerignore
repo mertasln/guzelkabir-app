@@ -1,0 +1,21 @@
+# apps/api/Dockerfile'ın build context'i repo kökü (docker-compose.yml
+# context: .. ile ayarlıyor) — burası kök .dockerignore, apps/api'ye özel
+# değil.
+node_modules
+**/node_modules
+.git
+.turbo
+**/.turbo
+dist
+**/dist
+.next
+**/.next
+out
+**/out
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+docs
+design_handoff_guzelkabir
+.github

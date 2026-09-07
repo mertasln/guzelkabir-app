@@ -432,9 +432,30 @@ Real SMS (Netgsm) + e-posta (Postmark) delivery for spec §9's 5 customer-facing
 
 **Not yet done:** WhatsApp, Twilio, a real send with live provider keys, and a recovery mechanism for rows stuck `'queued'` after a Redis outage. The two Ops-internal `channel='push'` notifications (SLA assignment escalation, evidence manual-review) are still queue-only — no push infra exists, out of this ADIM's scope (spec §9's table only covers the 6 customer-facing rows).
 
+## 6.16 Deployment (apps/api → DigitalOcean droplet) — spec §13, ADIM 11, prepared but not yet live
+
+Target is a **shared** existing droplet (Ubuntu 24.04.4 LTS) — already running nginx (80/443), a Node app (3000), a uvicorn app (8000), none of which may be touched. Only `otonom_trader` (an old unused project) is known-removable, and isn't needed for this plan.
+
+**Spec §13 wants managed Postgres/Redis, a load balancer + 2+ instances, Terraform** — none of that fits one shared droplet. User decision, same category as the iyzico single-provider / PayTR-deferred call: accept single-point-of-failure at pilot scale (spec §18.5-18.6), track real managed infra as an MVP2 item, don't invent it now.
+
+**Caddy → nginx pivot**: original plan used Caddy for zero-config SSL — dropped once the droplet's real state was known (Caddy can't share 80/443 with the existing nginx). Now: new, isolated nginx server blocks alongside the existing ones, certbot's `--nginx -d <domain>` plugin for SSL (only ever touches the server block matching the domain(s) passed, confirmed safe for the existing sites).
+
+**Subdomain plan** (domain not registered yet — `guzelkabir.com` is a placeholder throughout `deploy/`): `guzelkabir.com` (web), `admin.guzelkabir.com` (admin), `api.guzelkabir.com` (api — this ADIM's actual scope). Only `deploy/nginx/api.guzelkabir.com.conf` is real; the other two are `.example` stubs, not enabled — apps/web/apps/admin have no production deploy story built yet, genuinely out of scope here.
+
+**What's built:**
+- `apps/api/Dockerfile` — single-stage (not multi-stage) by design: Prisma's client lives in `apps/api`'s own non-hoisted `node_modules/.prisma`, and a multi-stage `COPY --from=builder` of that path couldn't be verified without real Docker (unavailable in this sandbox) — mirrors CI's already-proven `npm ci` → `npm run build --workspace=apps/api` sequence instead, at the cost of image size.
+- `deploy/docker-compose.yml` — `postgis/postgis:16-3.4` + `redis:7-alpine` + the api image, one bridge network. Postgres/Redis publish **no host ports** (Docker-network-internal only — structurally can't collide with the droplet's existing ports); `api` binds only `127.0.0.1:3001` (nginx is the only public entry point).
+- **Secrets via Doppler, not a droplet `.env` file** (spec §13.3's named alternative to AWS Secrets Manager) — `docker-compose.yml` has zero real values, every deploy wraps `docker compose` in `doppler run --token=... --project guzelkabir-api --config prd --`. **Real gap caught while writing this**: the original Doppler variable list was missing `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` (the Postgres container needs these to self-init, must match `DATABASE_URL`) — now documented in `deploy/README.md`.
+- **SSH hardening (user-requested) — the deploy key is forced-command-restricted.** Shared droplet risk flagged by the user: an unrestricted key means a leaked `DEPLOY_SSH_KEY` compromises the whole box (other people's nginx/node/uvicorn), not just GüzelKabir. Fixed with an `authorized_keys` `command="/bin/bash /opt/guzelkabir/deploy/remote-deploy.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty` restriction — the deploy logic moved out of the workflow file into `deploy/remote-deploy.sh` as a result (the forced command ignores whatever the client sends). This also meant `DOPPLER_TOKEN` could no longer safely ride an SSH session env var (not guaranteed to reach the process under a forced command) — it now lives once, locally, at `/etc/guzelkabir/doppler-token` (mode 600, outside the git-managed `/opt/guzelkabir`), read directly by the script. There is no `DOPPLER_TOKEN` GitHub secret anymore.
+- `.github/workflows/deploy-api.yml` — triggered by the `CI` workflow's completion (`workflow_run`, not raw `push` — structurally can't deploy if CI failed), gated behind `environment: production` (spec §13.1's literal environment-protection-rule requirement; "required reviewers" itself must be set once in repo Settings). Opens an SSH session (its own `script:` is inert, discarded by the forced command above); the real steps run inside `deploy/remote-deploy.sh` on the droplet: `git pull` → `docker compose build` → `prisma migrate deploy` (explicit step, before restart) → `docker compose up -d` → `/api/v1/health` retry-loop smoke check.
+  - **Two flagged simplifications vs. spec §13.2's literal pipeline**: no GHCR image push (build directly on the droplet instead — one less secret/auth surface), no separate staging environment + Playwright suite (spec's 3-env model is local+production only here). Both real, tracked gaps, not silently dropped.
+- `deploy/README.md` — the actual runbook (droplet setup including the forced-command key and Doppler token file, nginx/certbot commands, full Doppler variable list, required GitHub secrets, manual-deploy instructions).
+
+**Not yet done — none of this has run against the real droplet.** Domain unregistered (placeholder everywhere), SSH/nginx/certbot steps written but unexecuted, the Compose stack has never started on real hardware. A prepared, reviewed plan, not a verified deployment.
+
 ## 7. Deployment workflow
 
-No hosting/deploy integration is set up for this repo yet. Deployment targets (frontend, API, DB, object storage) land as part of the infra/DevOps step (spec §13).
+See §6.16 above for the real detail. Short version: `apps/api` deploys to a shared DigitalOcean droplet via Docker Compose + existing nginx + certbot, secrets from Doppler, GitHub Actions (`deploy-api.yml`) gated behind a `production` environment approval — see `deploy/README.md` for the actual runbook. `apps/web`/`apps/admin` have no deploy pipeline yet.
 
 Always run `npm run build` locally before pushing — CI (`.github/workflows/ci.yml`) runs the same lint/typecheck/build and will fail on type errors.
 

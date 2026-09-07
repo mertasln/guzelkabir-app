@@ -1,0 +1,105 @@
+# GüzelKabir production stack — spec §13, ADIM 11.
+#
+# PAYLAŞILAN droplet (kullanıcı kararı, bkz. CLAUDE.md "Deployment" bölümü):
+# bu droplet'te zaten başka aktif projeler var (nginx 80/443, node 3000,
+# uvicorn 8000) — onlara asla dokunulmaz. Bu yüzden:
+#   - postgres/redis HİÇBİR host portuna açılmıyor (yalnızca aşağıdaki
+#     `guzelkabir_net` Docker network'ü içinde, servis adlarıyla erişilebilir)
+#     — dışarıdan görünür bir port çakışması riski yapısal olarak yok.
+#   - api yalnızca 127.0.0.1:3001'e bağlanıyor (0.0.0.0 değil) — mevcut
+#     3000/8000 ile çakışmayan, host dışından hiç erişilemeyen bir port;
+#     tek giriş noktası mevcut nginx'in ters proxy'si (bkz. deploy/nginx/).
+#
+# Secrets (Doppler): bu dosya hiçbir gerçek değer İÇERMEZ — her `environment`
+# girdisi "VAR_ADI" (değer olmadan) şeklinde, Docker Compose'a bunu ÇAĞIRAN
+# shell process'inin ortam değişkenlerinden aynı isimle geçmesini söylüyor.
+# Deploy script'i (.github/workflows/deploy-api.yml) bu dosyayı her zaman
+# `doppler run --project guzelkabir-api --config prd -- docker compose ...`
+# ile sarmalıyor — gerçek değerler yalnızca Doppler'ın kendisinden, çalışma
+# anında geliyor, droplet'te hiçbir zaman bir dosyaya yazılmıyor.
+
+networks:
+  guzelkabir_net:
+    driver: bridge
+
+volumes:
+  guzelkabir_pgdata:
+  guzelkabir_redisdata:
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    networks:
+      - guzelkabir_net
+    # Host'a HİÇBİR port açılmıyor — kasıtlı, yukarıdaki nota bakın.
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+    volumes:
+      - guzelkabir_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - guzelkabir_net
+    # Host'a HİÇBİR port açılmıyor — kasıtlı, yukarıdaki nota bakın.
+    volumes:
+      - guzelkabir_redisdata:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    networks:
+      - guzelkabir_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Yalnızca localhost'a bağlı — nginx dışında hiçbir yerden erişilemez.
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      - PORT=3001
+      - DATABASE_URL
+      - REDIS_URL
+      - JWT_ACCESS_SECRET
+      - JWT_REFRESH_SECRET
+      - CORS_ORIGIN
+      - FRONTEND_URL
+      - IYZICO_API_KEY
+      - IYZICO_SECRET_KEY
+      - IYZICO_URI
+      - IYZICO_CALLBACK_URL
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_REGION
+      - S3_EVIDENCE_BUCKET
+      - S3_EVIDENCE_STAGING_BUCKET
+      - EVIDENCE_CDN_BASE_URL
+      - GEOTAG_DEFAULT_TOLERANCE_M
+      - NETGSM_USERNAME
+      - NETGSM_PASSWORD
+      - NETGSM_MSGHEADER
+      - POSTMARK_SERVER_TOKEN
+      - POSTMARK_FROM_EMAIL
+      - KMS_KEY_ID_PII
+      - WHATSAPP_BUSINESS_TOKEN
+      - SENTRY_DSN
+      - GOOGLE_MAPS_API_KEY

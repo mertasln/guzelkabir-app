@@ -1,0 +1,25 @@
+# PLACEHOLDER — apps/web (Next.js) HENÜZ bu droplet'e deploy edilmiyor.
+#
+# Bu ADIM'ın (ADIM 11) kapsamı yalnızca backend/DB/Redis (spec §13) —
+# apps/web'in kendi production build/deploy süreci (Next.js standalone
+# output mu, ayrı bir Docker container mı, hangi port mu — henüz
+# kararlaştırılmadı) icat edilmedi, gerçek bir ADIM olarak ayrıca
+# planlanmalı. Bu dosya yalnızca kullanıcının belirttiği 3-alt-domain
+# yapısını (guzelkabir.com / admin.guzelkabir.com / api.guzelkabir.com)
+# not düşmek için burada — `sites-enabled`'a ASLA sembolik bağlanmasın,
+# `.example` uzantısı kasıtlı (nginx bu dosyayı okumaz).
+#
+# server {
+#     listen 80;
+#     listen [::]:80;
+#     server_name guzelkabir.com www.guzelkabir.com;
+#
+#     location / {
+#         proxy_pass http://127.0.0.1:PORT_TBD;   # apps/web deploy edilince belirlenecek
+#         proxy_http_version 1.1;
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#     }
+# }

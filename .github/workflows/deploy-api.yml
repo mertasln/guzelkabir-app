@@ -1,0 +1,75 @@
+name: Deploy API (production)
+
+# spec §13.1: "production: manuel onaylı deploy (GitHub Actions environment
+# protection rule)". Bu workflow, main'deki CI workflow'u başarıyla bittiğinde
+# tetiklenir (aşağıdaki `on.workflow_run` notuna bakın) ama `deploy` job'ı
+# `environment: production` altında — gerçek onay kapısı GitHub repo
+# Settings → Environments → production'da tanımlı "required reviewers"
+# kuralı (bu dosyadan ayarlanamaz, kullanıcı repo ayarlarından bir kez
+# yapılandırmalı). Onaylanana kadar job beklemede kalır, otomatik çalışmaz.
+#
+# spec §13.2'nin "Docker image build + GHCR'ye push" adımı (33) BİLİNÇLİ
+# olarak burada YOK — droplet paylaşılan/tek bir sunucu olduğu için (bkz.
+# CLAUDE.md "Deployment" bölümü), image'ı CI'de build edip bir registry'ye
+# push etmek + droplet'te ayrı bir registry-auth mekanizması kurmak, tek
+# droplet'te doğrudan `git pull` + `docker compose build` yapmaktan daha
+# fazla hareketli parça (ek bir secret, ek bir auth yüzeyi) ekliyordu, pilot
+# ölçeğinde gerekli değildi — spec'in HA/multi-instance/Terraform
+# gereksinimlerini kabul etmediğimiz aynı pilot-ölçek kararının devamı.
+# Flaglenmiş bir basitleştirme, sessizce atlanmadı.
+#
+# ⚠️ SSH sertleştirmesi (kullanıcı talebi, ADIM 11 hardening pass'i): bu
+# droplet PAYLAŞILAN — GüzelKabir dışında da aktif projeler var (nginx,
+# node@3000, uvicorn@8000). DEPLOY_SSH_KEY secret'ı sızarsa, sınırsız bir
+# opsadmin shell'i etki alanını tüm droplet'e (diğer projeler dahil)
+# genişletirdi. Bunun önüne geçmek için droplet'teki
+# ~opsadmin/.ssh/authorized_keys satırına bu anahtara özel bir
+# `command="/bin/bash /opt/guzelkabir/deploy/remote-deploy.sh"` zorlaması
+# eklenmiştir (bkz. deploy/README.md §2) — bu key ile açılan HER SSH
+# oturumu, istemci ne gönderirse göndersin, SADECE bu script'i çalıştırabilir,
+# genel bir shell açamaz. **Sonuç: aşağıdaki `script:` alanının içeriği
+# sunucu tarafında YOK SAYILIR** — gerçek deploy mantığı artık bu workflow
+# dosyasında değil, `deploy/remote-deploy.sh`'ta yaşıyor; deploy adımlarını
+# değiştirmek için workflow'u değil, o script'i güncelleyin.
+#
+# Aynı sertleştirmenin bir sonucu: DOPPLER_TOKEN artık bir SSH oturum ortam
+# değişkeni olarak GEÇİRİLMİYOR (forced-command altında istemcinin env-export
+# enjeksiyonunun güvenilir şekilde ulaşacağı garanti değil) — token bunun
+# yerine droplette /etc/guzelkabir/doppler-token'da (yalnızca opsadmin
+# okuyabilir, mode 600) yerel olarak duruyor, remote-deploy.sh onu oradan
+# okuyor (bkz. deploy/README.md §3). GitHub secrets listesinde artık bir
+# DOPPLER_TOKEN YOK.
+on:
+  # spec §13.2 adım 30-32 (lint/test/integration) BAŞARIYLA bitmeden deploy
+  # pipeline'ı hiç başlamasın diye `push` değil, mevcut CI workflow'unun
+  # ("CI", .github/workflows/ci.yml) SONUCUNU dinliyoruz — aynı push
+  # event'inde iki workflow paralel koşup CI kırmızıyken bir reviewer'ın
+  # yanlışlıkla onaylaması riskini yapısal olarak ortadan kaldırıyor.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # workflow_dispatch ile elle tetiklenirse (CI event'i yok) ya da CI
+    # gerçekten başarılıysa çalış — CI başarısızken asla.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    environment: production
+    steps:
+      - name: Trigger deploy (forced SSH command runs deploy/remote-deploy.sh)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: ${{ secrets.DEPLOY_SSH_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "Bu satırın içeriği önemsiz — authorized_keys'teki command="
+            echo "zorlaması ne gönderilirse gönderilsin deploy/remote-deploy.sh'ı"
+            echo "çalıştırır (bkz. deploy/README.md §2)."

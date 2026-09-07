@@ -1,0 +1,22 @@
+# PLACEHOLDER — apps/admin (React + Vite) HENÜZ bu droplet'e deploy edilmiyor.
+# Aynı gerekçe web.guzelkabir.com.conf.example'daki gibi — bu ADIM'ın kapsamı
+# değil, icat edilmedi. `sites-enabled`'a ASLA sembolik bağlanmasın.
+#
+# apps/admin bir Vite SPA (statik build çıktısı) — muhtemelen ayrı bir
+# container/process gerekmeden doğrudan nginx'in kendisi tarafından
+# `root`/`try_files` ile servis edilebilir (apps/web'in aksine, o bir Next.js
+# server process'i gerektiriyor). Bu da henüz kararlaştırılmadı, gerçek bir
+# ADIM olarak ayrıca planlanmalı.
+#
+# server {
+#     listen 80;
+#     listen [::]:80;
+#     server_name admin.guzelkabir.com;
+#
+#     root /var/www/guzelkabir-admin/dist;   # apps/admin deploy edilince belirlenecek
+#     index index.html;
+#
+#     location / {
+#         try_files $uri $uri/ /index.html;
+#     }
+# }
