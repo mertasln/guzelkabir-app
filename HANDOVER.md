@@ -440,7 +440,7 @@ Target is a **shared** existing droplet (Ubuntu 24.04.4 LTS) — already running
 
 **Caddy → nginx pivot**: original plan used Caddy for zero-config SSL — dropped once the droplet's real state was known (Caddy can't share 80/443 with the existing nginx). Now: new, isolated nginx server blocks alongside the existing ones, certbot's `--nginx -d <domain>` plugin for SSL (only ever touches the server block matching the domain(s) passed, confirmed safe for the existing sites).
 
-**Subdomain plan** (domain not registered yet — `guzelkabir.com` is a placeholder throughout `deploy/`): `guzelkabir.com` (web), `admin.guzelkabir.com` (admin), `api.guzelkabir.com` (api — this ADIM's actual scope). Only `deploy/nginx/api.guzelkabir.com.conf` is real; the other two are `.example` stubs, not enabled — apps/web/apps/admin have no production deploy story built yet, genuinely out of scope here.
+**Subdomain plan — domain is now real** (registered, DNS fully propagated to the droplet's IP `165.227.204.8`, user-confirmed): `guzelkabir.com` (web), `admin.guzelkabir.com` (admin), `api.guzelkabir.com` (api — this ADIM's actual scope). Only `deploy/nginx/api.guzelkabir.com.conf` is real; the other two are `.example` stubs, not enabled — apps/web/apps/admin have no production deploy story built yet, genuinely out of scope here. **Droplet nginx state verified**: an existing `berber` config is `default_server` (`server_name _;`) — every GüzelKabir config uses an exact `server_name` and never `default_server`, so `berber` is never affected. **SSL scope decision**: certbot runs for `api.guzelkabir.com` only for now — Let's Encrypt's 50-certs/week-per-registered-domain limit isn't actually a binding constraint for 3 total certs, so there's no real cost to deferring `guzelkabir.com`/`admin.guzelkabir.com` until those apps have a real deploy story (avoids fronting a nonexistent backend with a public, SSL-secured domain).
 
 **What's built:**
 - `apps/api/Dockerfile` — single-stage (not multi-stage) by design: Prisma's client lives in `apps/api`'s own non-hoisted `node_modules/.prisma`, and a multi-stage `COPY --from=builder` of that path couldn't be verified without real Docker (unavailable in this sandbox) — mirrors CI's already-proven `npm ci` → `npm run build --workspace=apps/api` sequence instead, at the cost of image size.
@@ -451,7 +451,7 @@ Target is a **shared** existing droplet (Ubuntu 24.04.4 LTS) — already running
   - **Two flagged simplifications vs. spec §13.2's literal pipeline**: no GHCR image push (build directly on the droplet instead — one less secret/auth surface), no separate staging environment + Playwright suite (spec's 3-env model is local+production only here). Both real, tracked gaps, not silently dropped.
 - `deploy/README.md` — the actual runbook (droplet setup including the forced-command key and Doppler token file, nginx/certbot commands, full Doppler variable list, required GitHub secrets, manual-deploy instructions).
 
-**Not yet done — none of this has run against the real droplet.** Domain unregistered (placeholder everywhere), SSH/nginx/certbot steps written but unexecuted, the Compose stack has never started on real hardware. A prepared, reviewed plan, not a verified deployment.
+**Not yet done — none of this has run against the real droplet.** Domain is registered and DNS is live, but SSH/nginx/certbot steps are still written-but-unexecuted, the Compose stack has never started on real hardware. A prepared, reviewed plan, not a verified deployment.
 
 ## 7. Deployment workflow
 

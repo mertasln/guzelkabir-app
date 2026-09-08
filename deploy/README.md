@@ -38,14 +38,23 @@ Deploy mantığını değiştirmek istersen `.github/workflows/deploy-api.yml`'i
 
 ## 2. nginx + certbot (mevcut nginx'e YENİ bir server block ekleniyor, var olanlara dokunulmuyor)
 
+**Droplet'in gerçek nginx durumu doğrulandı (kullanıcı tarafından kontrol edildi) — iki mevcut config var:**
+- `yakupmertaslan.com` — kendi domain'ine özel `server_name`, `default_server` DEĞİL, sorun yok.
+- `berber` — **`default_server`** olarak işaretli (`listen 80 default_server; server_name _;`) — eşleşmeyen TÜM istekler şu an buraya düşüyor.
+
+**Kural: GüzelKabir'in üç config'inden (api/admin/web) hiçbiri `default_server` bildirmez, hiçbiri `berber`'e dokunmaz.** Her birinin `server_name`'i tam ve kesin (`api.guzelkabir.com`, `admin.guzelkabir.com`, `guzelkabir.com`+`www.guzelkabir.com`) — nginx, `Host` header'ı bu isimlerden biriyle birebir eşleşmeyen hiçbir isteği bu server block'lara yönlendirmez, `berber`'in `default_server` statüsü değişmeden kalır. `deploy/nginx/*.conf`/`*.conf.example` dosyalarının her biri bunu üstteki yorumda tekrar doğruluyor — yeni bir subdomain eklenirse aynı disiplin (tam `server_name`, asla `default_server`) korunmalı.
+
+Domain gerçek ve DNS tam yayıldı (kullanıcı doğruladı — üç subdomain de `165.227.204.8`'e çözümleniyor), dosyadaki `api.guzelkabir.com` değerine dokunmaya gerek yok:
+
 ```bash
 sudo cp /opt/guzelkabir/deploy/nginx/api.guzelkabir.com.conf /etc/nginx/sites-available/
-# gerçek domain alındığında dosya içindeki "api.guzelkabir.com"u değiştir
 sudo ln -s /etc/nginx/sites-available/api.guzelkabir.com.conf /etc/nginx/sites-enabled/
-sudo nginx -t          # mevcut config'i BOZMADIĞINI doğrula
+sudo nginx -t          # mevcut config'i (yakupmertaslan.com, berber) BOZMADIĞINI doğrula
 sudo systemctl reload nginx
 sudo certbot --nginx -d api.guzelkabir.com   # yalnızca bu domain'e ait server block'u düzenler
 ```
+
+**Yalnızca `api.guzelkabir.com` için** — `guzelkabir.com`/`admin.guzelkabir.com` şimdilik bilinçli olarak dışarıda bırakıldı (bkz. CLAUDE.md "SSL certificate scope" notu): apps/web/apps/admin'in henüz gerçek bir deploy hikayesi yok, o iki domain için şimdi sertifika+server block açmak arkasında çalışan bir uygulama olmayan, herkese açık bir domain'i canlıya çıkarmak anlamına gelirdi. Let's Encrypt'in haftalık limiti (registered domain başına 50 sertifika, tüm subdomain'ler dahil) bu projede toplam 3 sertifika için gerçek bir kısıt değil, o yüzden ileride ayrı almanın maliyeti yok.
 
 `web.guzelkabir.com.conf.example` / `admin.guzelkabir.com.conf.example` — henüz `sites-enabled`'a bağlanmasın, apps/web ve apps/admin bu ADIM'ın kapsamında değil (bkz. CLAUDE.md).
 

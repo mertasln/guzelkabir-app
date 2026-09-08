@@ -9,6 +9,11 @@
 # not düşmek için burada — `sites-enabled`'a ASLA sembolik bağlanmasın,
 # `.example` uzantısı kasıtlı (nginx bu dosyayı okumaz).
 #
+# ⚠️ Etkinleştirildiğinde: droplet'te mevcut `berber` config'i default_server
+# (server_name _;) — eşleşmeyen tüm istekler oraya düşüyor. Aşağıdaki
+# server_name'i (guzelkabir.com + www.guzelkabir.com) tam/kesin tutun,
+# default_server bildirmeyin — berber'in statüsünü değiştirmez/çalmaz.
+#
 # server {
 #     listen 80;
 #     listen [::]:80;
