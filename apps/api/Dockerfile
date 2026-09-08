@@ -26,8 +26,30 @@ COPY apps ./apps
 COPY packages ./packages
 
 # postinstall (root → apps/api'ye delege eder → prisma generate) npm ci
-# sırasında otomatik çalışır — bkz. yukarıdaki not.
-RUN npm ci
+# sırasında otomatik çalışır. apps/api/prisma.config.ts, dotenv/config'i
+# import ettikten sonra `env("DATABASE_URL")` (bkz. @prisma/config'in kaynağı,
+# apps/api/node_modules/@prisma/config/dist/index.js) çağırıyor — bu düz
+# `process.env.DATABASE_URL` okuyup boşsa fırlatıyor, gerçek bir bağlantı
+# KURMUYOR, yalnızca şemayı okuyup client tiplerini üretiyor (aynı gerekçeyle
+# .github/workflows/ci.yml'in lint-typecheck-build job'ında da sahte bir
+# DATABASE_URL kullanılıyor).
+#
+# ⚠️ Düzeltilmiş gerçek hata: `ARG DATABASE_URL=...` TEK BAŞINA yeterli
+# DEĞİL — ARG değeri yalnızca o Dockerfile satırının METNİ içinde `$VAR` ile
+# referans verilirse görünür, `RUN npm ci` komutunun kendi process ortamına
+# OTOMATİK enjekte edilmiyor (ilk denemede bu yanlış varsayıldı, aynı hatayı
+# aynen tekrarlattı). Bu yüzden aşağıda ARG'ı doğrudan RUN'un komut satırına
+# `DATABASE_URL="$DATABASE_URL"` öneki olarak veriyoruz — bu, yalnızca bu tek
+# RUN adımının (ve npm ci'nin doğurduğu her alt process'in: postinstall →
+# prisma generate → prisma.config.ts) process ortamına yazar. ENV
+# kullanmadık (kalıcı olurdu) — gerçek DATABASE_URL yalnızca runtime'da
+# docker-compose.yml'in environment: girdisi üzerinden (Doppler'dan) geliyor;
+# bu sahte değer imajın hiçbir çalışan konteynerinde asla mevcut olmuyor.
+# Doppler enjeksiyonu başarısız olursa uygulama runtime'da DATABASE_URL
+# tanımsız olduğu için AÇIKÇA patlar — sessizce bu sahte değere bağlanmaya
+# çalışmaz.
+ARG DATABASE_URL=postgresql://build:build@localhost:5432/build?schema=public
+RUN DATABASE_URL="$DATABASE_URL" npm ci
 
 RUN npm run build --workspace=apps/api
 
