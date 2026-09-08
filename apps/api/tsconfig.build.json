@@ -1,4 +1,34 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  "compilerOptions": {
+    // Belirtilmezse tsc, girdi dosyalarının ORTAK ATA'sını rootDir olarak
+    // çıkarır. prisma.config.ts/prisma/seed.ts src/ DIŞINDA olduğu için
+    // (aşağıdaki exclude'a bakın — artık derlemeye hiç girmiyorlar ama bu
+    // ayar olmadan bile tek başına yeterli değildi, deploy'da gerçek bir
+    // hata olarak bulundu) o dosyalar hâlâ derlemede olsaydı ortak ata
+    // apps/api/ (src/ değil) olurdu, çıktı da beklenenin bir katman
+    // altına, dist/src/main.js'e kayardı — dist/main.js'e değil. rootDir'i
+    // açıkça src/ olarak sabitlemek bunu yapısal olarak imkansız kılıyor.
+    "rootDir": "./src"
+  },
+  // prisma.config.ts ve prisma/seed.ts src/ DIŞINDA yaşıyor ama önceden
+  // (bu exclude olmadan) tsc'nin varsayılan "her .ts dosyasını dahil et"
+  // davranışıyla derlemeye giriyorlardı — gereksiz: prisma.config.ts
+  // doğrudan Prisma CLI'nin kendi TS yükleyicisi tarafından okunuyor,
+  // prisma/seed.ts da zaten `ts-node prisma/seed.ts` ile (prisma.config.ts'in
+  // migrations.seed alanı, derlenmiş dist/ çıktısı üzerinden DEĞİL) çalışıyor
+  // — hiçbiri kendi dist/ karşılığından hiç kullanılmıyor. Gerçek, önceden
+  // fark edilmemiş bir hatanın kök nedeniydi bu: bu iki dosyanın derlemede
+  // olması rootDir çıkarımını apps/api/'ye kaydırıp TÜM src/ çıktısını
+  // dist/src/'e itiyordu — Dockerfile'ın CMD'si (node dist/main) VE
+  // package.json'ın kendi start:prod script'i (node dist/main) ikisi de bunu
+  // hiç yakalamamıştı (dev modu bu yola hiç dokunmuyor).
+  "exclude": [
+    "node_modules",
+    "test",
+    "dist",
+    "**/*spec.ts",
+    "prisma.config.ts",
+    "prisma"
+  ]
 }
