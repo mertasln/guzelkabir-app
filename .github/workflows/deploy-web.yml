@@ -1,0 +1,91 @@
+name: Deploy Web (production)
+
+# spec §13, ADIM 12 (apps/web deploy) — mirrors deploy-api.yml's shape
+# (workflow_run-gated on CI, environment: production approval gate) but a
+# genuinely different deploy mechanism: apps/web is a static export
+# (output: "export", see apps/web/next.config.ts), built HERE in GitHub
+# Actions rather than on the droplet — deliberately, unlike apps/api's
+# Docker build. Reasoning: no Node needs to be installed natively on the
+# shared droplet at all (apps/api's Node/Prisma toolchain lives entirely
+# inside its container), and the Next.js compiler's CPU/memory work stays
+# off a box other people's node@3000/uvicorn@8000 also run on. See
+# CLAUDE.md's "Deployment (apps/web)" section for the full rationale.
+#
+# The built out/ directory is tarred and piped over stdin to a SEPARATE,
+# dedicated forced-command SSH key (guzelkabir-deploy-web, NOT apps/api's
+# guzelkabir-deploy key) — deploy/remote-deploy-web.sh is the only thing
+# that key can run. A forced command overrides whatever the client sends
+# but still passes stdin/stdout through normally, which is what makes the
+# piped-tarball approach work at all under this restriction (scp/rsync's
+# own remote-invocation protocol would NOT work here, since the forced
+# command replaces whatever they'd try to invoke server-side).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    environment: production
+    env:
+      # Baked into the static client bundle at build time (Next.js's
+      # NEXT_PUBLIC_ convention) — not a secret, it's a public URL any
+      # browser's network tab already shows. Kept here as a plain literal,
+      # not routed through Doppler/secrets, on purpose.
+      NEXT_PUBLIC_API_URL: https://api.guzelkabir.com/api/v1
+      # Root `npm ci` triggers apps/api's own postinstall (`prisma
+      # generate`) too, in this monorepo — needs *a* DATABASE_URL defined
+      # to not throw (never opens a real connection, see apps/api/Dockerfile's
+      # own comment on this exact issue). Reusing ci.yml's existing fake
+      # placeholder secret, not inventing a new one.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build (static export)
+        run: npm run build --workspace=apps/web
+
+      - name: Verify NEXT_PUBLIC_API_URL was actually baked into the build
+        # Not optimism — a real, fail-loud check. Confirmed by direct local
+        # testing (see CLAUDE.md's Deployment section) that the exact full
+        # URL string lands verbatim in the built output, and that grepping
+        # for a wrong URL genuinely fails rather than false-passing.
+        run: |
+          if ! grep -rlF "$NEXT_PUBLIC_API_URL" apps/web/out/ > /dev/null; then
+            echo "::error::Expected API URL ($NEXT_PUBLIC_API_URL) not found anywhere in apps/web/out/ — NEXT_PUBLIC_API_URL likely didn't reach next build."
+            exit 1
+          fi
+          if grep -rlF "localhost:3001" apps/web/out/ > /dev/null; then
+            echo "::error::Found the localhost fallback API URL baked into the production build output — NEXT_PUBLIC_API_URL was not set correctly."
+            exit 1
+          fi
+          echo "Verified: $NEXT_PUBLIC_API_URL is correctly baked into the static export."
+
+      - name: Deploy (tarball piped over SSH to the forced-command script)
+        env:
+          DEPLOY_SSH_KEY_WEB: ${{ secrets.DEPLOY_SSH_KEY_WEB }}
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
+        run: |
+          set -euo pipefail
+          key_file="$(mktemp)"
+          trap 'rm -f "$key_file"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY_WEB" > "$key_file"
+          chmod 600 "$key_file"
+          tar -czf - -C apps/web/out . | ssh -i "$key_file" -p "$DEPLOY_SSH_PORT" \
+            -o StrictHostKeyChecking=accept-new \
+            "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST"

@@ -1,4 +1,4 @@
-# GüzelKabir API — production deploy (spec §13, ADIM 11)
+# GüzelKabir — production deploy (spec §13, ADIM 11: apps/api, ADIM 12: apps/web)
 
 Paylaşılan bir DigitalOcean droplet'e (Ubuntu 24.04, üzerinde zaten aktif nginx/node@3000/uvicorn@8000 var — hiçbirine dokunulmuyor). Bkz. `CLAUDE.md`'nin "Deployment" bölümü, kararların gerekçesi için.
 
@@ -36,6 +36,23 @@ cat ~/.ssh/guzelkabir-deploy   # bunun İÇERİĞİNİ GitHub secret'ı DEPLOY_S
 
 Deploy mantığını değiştirmek istersen `.github/workflows/deploy-api.yml`'i değil, `deploy/remote-deploy.sh`'ı güncelle — workflow'un gönderdiği komut içeriği bu zorlama tarafından sunucu tarafında yok sayılıyor, `git pull` her deploy'da script'in kendisini de günceller.
 
+**apps/web için AYRI, kendi forced-command key'i (ADIM 12) — `guzelkabir-deploy` (yukarıdaki) ile KARIŞTIRMAYIN.** apps/web statik export olarak deploy ediliyor (build GitHub Actions'ta yapılıyor, droplette Node YOK) — `remote-deploy-web.sh` bir tarball'ı stdin'den okuyup `/var/www/guzelkabir-web`'e açıyor, `remote-deploy.sh` gibi `git pull` yapmıyor. Per-purpose key ayrımı: bu key sızsa bile yalnızca web dizinini değiştirebilir, apps/api container'larına/veritabanına dokunamaz — aynı gerekçe, ayrı anahtar:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/guzelkabir-deploy-web -N ""
+
+PUBKEY=$(cat ~/.ssh/guzelkabir-deploy-web.pub)
+echo "command=\"/bin/bash /opt/guzelkabir/deploy/remote-deploy-web.sh\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty $PUBKEY" >> ~/.ssh/authorized_keys
+
+cat ~/.ssh/guzelkabir-deploy-web   # bunun İÇERİĞİNİ GitHub secret'ı DEPLOY_SSH_KEY_WEB'e kopyala
+```
+
+`remote-deploy-web.sh` `rsync` kullanıyor — droplette kurulu değilse: `sudo apt-get install -y rsync`. Web dizinini de şimdi oluştur:
+```bash
+sudo mkdir -p /var/www/guzelkabir-web
+sudo chown opsadmin:opsadmin /var/www/guzelkabir-web
+```
+
 ## 2. nginx + certbot (mevcut nginx'e YENİ bir server block ekleniyor, var olanlara dokunulmuyor)
 
 **Droplet'in gerçek nginx durumu doğrulandı (kullanıcı tarafından kontrol edildi) — iki mevcut config var:**
@@ -54,9 +71,27 @@ sudo systemctl reload nginx
 sudo certbot --nginx -d api.guzelkabir.com   # yalnızca bu domain'e ait server block'u düzenler
 ```
 
-**Yalnızca `api.guzelkabir.com` için** — `guzelkabir.com`/`admin.guzelkabir.com` şimdilik bilinçli olarak dışarıda bırakıldı (bkz. CLAUDE.md "SSL certificate scope" notu): apps/web/apps/admin'in henüz gerçek bir deploy hikayesi yok, o iki domain için şimdi sertifika+server block açmak arkasında çalışan bir uygulama olmayan, herkese açık bir domain'i canlıya çıkarmak anlamına gelirdi. Let's Encrypt'in haftalık limiti (registered domain başına 50 sertifika, tüm subdomain'ler dahil) bu projede toplam 3 sertifika için gerçek bir kısıt değil, o yüzden ileride ayrı almanın maliyeti yok.
+O sırada **yalnızca `api.guzelkabir.com` için** sertifika alınmıştı — `guzelkabir.com` şimdi (ADIM 12) hazır, `admin.guzelkabir.com` hâlâ bilinçli olarak dışarıda (apps/admin'in henüz gerçek bir deploy hikayesi yok — `admin.guzelkabir.com.conf.example` hâlâ `.example`, `sites-enabled`'a bağlanmasın).
 
-`web.guzelkabir.com.conf.example` / `admin.guzelkabir.com.conf.example` — henüz `sites-enabled`'a bağlanmasın, apps/web ve apps/admin bu ADIM'ın kapsamında değil (bkz. CLAUDE.md).
+**apps/web'i etkinleştir (ADIM 12) — `berber`'e dokunmadan, ayrı/bağımsız iki server block:**
+```bash
+sudo cp /opt/guzelkabir/deploy/nginx/web.guzelkabir.com.conf /etc/nginx/sites-available/
+sudo ln -s /etc/nginx/sites-available/web.guzelkabir.com.conf /etc/nginx/sites-enabled/
+sudo nginx -t          # mevcut config'i (api.guzelkabir.com, yakupmertaslan.com, berber) BOZMADIĞINI doğrula
+sudo systemctl reload nginx
+sudo certbot --nginx -d guzelkabir.com -d www.guzelkabir.com   # tek sertifika, iki isim
+```
+`www.guzelkabir.com` → `guzelkabir.com` 301 yönlendirmesi dosyanın kendisinde tanımlı (kullanıcı onaylı karar, ADIM 12 planlaması) — certbot yine de her iki isim için de kendi 443 bloğunu ekleyecek (redirect HTTPS üzerinden de çalışsın diye).
+
+**⚠️ "certbot otomatik ekleyecek" bir varsayımdır, kanıt değil — certbot çalıştıktan sonra gerçekten doğrula:**
+```bash
+curl -I http://www.guzelkabir.com     # beklenen: 301, Location: https://guzelkabir.com/
+curl -I https://www.guzelkabir.com    # beklenen: 301 (SSL hatası YOK — sertifika www için de geçerli olmalı), Location: https://guzelkabir.com/
+curl -I https://guzelkabir.com        # beklenen: 200 — asıl hedef gerçekten içerik servis ediyor
+```
+Üçü de beklenen çıktıyı vermeden bu ADIM'ı "doğrulandı" saymayın.
+
+Let's Encrypt'in haftalık limiti (registered domain başına 50 sertifika, tüm subdomain'ler dahil) toplam 3-4 sertifika için gerçek bir kısıt değil — `admin.guzelkabir.com`'u ileride ayrı almanın maliyeti yok.
 
 ## 3. Doppler — proje kurulumu
 
@@ -93,21 +128,28 @@ Bu dosya `/opt/guzelkabir` (git repo) DIŞINDA — `git fetch`/`git reset --hard
 
 - **Settings → Environments → New environment → `production`** → "Required reviewers" ekle (spec §13.1'in "manuel onaylı deploy" gereksinimi tam olarak bu).
 - **Settings → Secrets and variables → Actions**, şu secret'ları ekle:
-  - `DEPLOY_SSH_HOST` — droplet IP/hostname
-  - `DEPLOY_SSH_USER` — `opsadmin`
-  - `DEPLOY_SSH_KEY` — yukarıda üretilen `guzelkabir-deploy` private key'in TAM içeriği (§2'deki `command=` zorlamasıyla eşleşen anahtar — sızsa bile yalnızca `deploy/remote-deploy.sh`'ı çalıştırabilir, genel shell açamaz)
-  - `DEPLOY_SSH_PORT` — genelde `22`, farklıysa belirt (opsiyonel, workflow varsayılan 22 kullanır)
+  - `DEPLOY_SSH_HOST` — droplet IP/hostname (her iki workflow da aynısını kullanır)
+  - `DEPLOY_SSH_USER` — `opsadmin` (her iki workflow da aynısını kullanır)
+  - `DEPLOY_SSH_PORT` — genelde `22`, farklıysa belirt (opsiyonel, workflow varsayılan 22 kullanır; her iki workflow da aynısını kullanır)
+  - `DEPLOY_SSH_KEY` — `guzelkabir-deploy` private key'in TAM içeriği — **yalnızca `deploy-api.yml`'in kullandığı** (§1'deki `command=` zorlamasıyla eşleşen anahtar — sızsa bile yalnızca `deploy/remote-deploy.sh`'ı çalıştırabilir)
+  - `DEPLOY_SSH_KEY_WEB` — `guzelkabir-deploy-web` private key'in TAM içeriği — **yalnızca `deploy-web.yml`'in kullandığı**, `DEPLOY_SSH_KEY` ile AYNI DEĞİL (§1'deki ikinci `command=` zorlamasıyla eşleşen, ayrı anahtar — sızsa bile yalnızca `remote-deploy-web.sh`'ı çalıştırabilir, apps/api'ye dokunamaz)
+  - `DATABASE_URL` — `ci.yml`'in zaten kullandığı sahte placeholder secret'ın AYNISI, `deploy-web.yml`'de de kullanılıyor (kök `npm ci`, apps/api'nin `postinstall`'ını da tetikliyor — `prisma generate` gerçek bir bağlantı kurmuyor, yalnızca tanımlı bir değer istiyor)
 
-  **`DOPPLER_TOKEN` burada YOK** — §3'teki sertleştirme sonrası droplette `/etc/guzelkabir/doppler-token`'da yerel olarak duruyor, GitHub'a hiç taşınmıyor.
+  **`DOPPLER_TOKEN` burada YOK** — §3'teki sertleştirme sonrası droplette `/etc/guzelkabir/doppler-token`'da yerel olarak duruyor, GitHub'a hiç taşınmıyor. **apps/web'in Doppler'a hiç ihtiyacı yok** — tek build-time değeri (`NEXT_PUBLIC_API_URL`) gizli değil, `deploy-web.yml`'in içinde düz metin olarak duruyor.
 
 ## 5. Deploy nasıl tetiklenir
 
-`main`'deki `CI` workflow'u (lint/typecheck/build) BAŞARIYLA bittiğinde `deploy-api.yml` otomatik tetiklenir (CI kırmızıysa hiç başlamaz) — ama `production` environment'ının "required reviewers" onayı gelene kadar `deploy` job'ı beklemede kalır (spec §13.1). Onaylandıktan sonra: GitHub Actions SSH'a bağlanır, ama §2'deki `command=` zorlaması nedeniyle workflow'un gönderdiği komut önemsiz — droplette gerçekte çalışan her zaman `deploy/remote-deploy.sh`'tır: `git pull` → `docker compose build` → `prisma migrate deploy` → `docker compose up -d` → `/api/v1/health` smoke check.
+`main`'deki `CI` workflow'u (lint/typecheck/build) BAŞARIYLA bittiğinde **hem** `deploy-api.yml` **hem** `deploy-web.yml` otomatik tetiklenir (CI kırmızıysa hiçbiri başlamaz) — ikisi de bağımsız, `production` environment'ının "required reviewers" onayını ayrı ayrı bekler (spec §13.1). Şu an ikisi de her CI başarısında tetikleniyor (path-filtreleme yok — yalnızca apps/web değişse bile deploy-api.yml da tetiklenir, ve tersi; küçük bir verimsizlik, gelecekte `paths:` filtresiyle iyileştirilebilir, şu an flaglenmiş bir basitleştirme).
 
-**Manuel deploy** (acil durum, CI olmadan): Actions sekmesinden `Deploy API (production)` workflow'unu `workflow_dispatch` ile elle tetikleyebilirsin — aynı onay kapısından geçer.
+- **`deploy-api.yml`**: onaylandıktan sonra GitHub Actions SSH'a bağlanır, ama §1'deki `command=` zorlaması nedeniyle workflow'un gönderdiği komut önemsiz — droplette gerçekte çalışan her zaman `deploy/remote-deploy.sh`'tır: `git pull` → `docker compose build` → `prisma migrate deploy` → `docker compose up -d` → `/api/v1/health` smoke check.
+- **`deploy-web.yml`**: build (statik export) ve doğrulama (`NEXT_PUBLIC_API_URL`'in gerçekten gömüldüğü kontrolü) GitHub Actions'ın kendi runner'ında olur — droplete yalnızca bitmiş `out/` dizini bir tarball olarak, `guzelkabir-deploy-web` anahtarı üzerinden stdin'den akıtılır; `remote-deploy-web.sh` onu `/var/www/guzelkabir-web`'e açar.
+
+**Manuel deploy** (acil durum, CI olmadan): Actions sekmesinden `Deploy API (production)` ya da `Deploy Web (production)` workflow'unu `workflow_dispatch` ile elle tetikleyebilirsin — ikisi de aynı onay kapısından geçer.
 
 ## Bilinçli basitleştirmeler (spec §13.2'den sapma, flaglenmiş)
 
 - **GHCR image push/pull yok** — droplet üzerinde doğrudan `git pull` + `docker compose build`. Ek bir registry-auth secret'ı gerektirmeden pilot ölçeğinde yeterli; bkz. `deploy-api.yml`'in üst yorumu.
 - **Ayrı bir staging ortamı yok** — spec §13.1'in üç-ortam modeli (local/staging/production) bu ADIM'da yalnızca local+production olarak kuruldu. Staging, ayrı bir droplet/App Platform kaynağı gerektirir — bu ADIM'ın kapsamında sağlanmadı, "Before going live" listesine eklenmeli.
 - **Playwright smoke test yok** — yalnızca bir `curl /api/v1/health` kontrolü. Gerçek bir staging+Playwright akışı, yukarıdaki staging boşluğu kapatılınca anlamlı olur.
+- **`deploy-web.yml`'de `rsync --delete`, symlink-swap bir `releases/` deseni değil** — tarball önce geçici bir dizine açılıp doğrulandıktan (`index.html` var mı) sonra `rsync -a --delete` ile `/var/www/guzelkabir-web`'e uygulanıyor. Mükemmel atomik değil (senkron sırasında bir istek teorik olarak yarı-güncellenmiş bir dizin görebilir) — pilot ölçekte bu, bir symlink-swap deseninin ek karmaşıklığına değmeyen, kabul edilmiş bir basitleştirme.
+- **`deploy-api.yml`/`deploy-web.yml`'de `paths:` filtresi yok** — ikisi de her CI başarısında tetikleniyor, değişen dizinden bağımsız. `production` environment'ının onay kapısı zaten her deploy'u elle onaylatıyor, o yüzden gereksiz bir otomatik deploy'un pratik riski düşük — ama gelecekte gürültüyü azaltmak için `paths: ['apps/api/**']`/`['apps/web/**']` eklenebilir.
