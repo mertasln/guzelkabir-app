@@ -454,7 +454,7 @@ Target is a **shared** existing droplet (Ubuntu 24.04.4 LTS) — already running
 
 **✅ Live-verified, both deploy paths.** Manual (`bash deploy/remote-deploy.sh`, run directly as `opsadmin`): confirmed against the real droplet, real `postgis/postgis:16-3.4` (PostGIS's standing sandbox-only caveat is resolved for real now), real nginx+certbot SSL — `curl -I https://api.guzelkabir.com/api/v1/health` → `200 OK`. Automated (GitHub Actions, `workflow_dispatch`): `production` environment approval gate + forced-command SSH both confirmed working — "Success." Still open: the `workflow_run`-from-`push` auto-trigger chain hasn't had its own separate live run yet (architecturally identical to the tested `workflow_dispatch` path).
 
-## 6.17 Deployment (apps/web) — spec §13, ADIM 12, built, not yet deployed
+## 6.17 Deployment (apps/web) — spec §13, ADIM 12, done and live-verified
 
 Same droplet/nginx/`production`-environment pattern as §6.16, genuinely different mechanism — verified, not assumed by analogy:
 
@@ -463,13 +463,15 @@ Same droplet/nginx/`production`-environment pattern as §6.16, genuinely differe
 - **`NEXT_PUBLIC_API_URL`** (baked into the static bundle at build time, not secret) is verified — not assumed — to land verbatim in the built output via a real local test; `deploy-web.yml` runs the identical check as a real CI step, fails loudly if the URL is missing or the `localhost` fallback leaked through. Root `npm ci` also triggers apps/api's `prisma generate` in this same job (same `DATABASE_URL`-at-build-time issue as §6.16 — reused the same fix, `ci.yml`'s existing placeholder secret, instead of rediscovering it live).
 - **Transfer: tarball piped over stdin to a forced-command SSH script, not `scp`/`rsync`** — those need to invoke their own remote binary, which a forced command overrides; stdin/stdout still pass through normally, so `tar -czf - | ssh ...` works. `deploy/remote-deploy-web.sh` extracts to a temp dir first, sanity-checks `index.html` exists, then `rsync -a --delete`s into `/var/www/guzelkabir-web`.
 - **A SEPARATE dedicated SSH key (`guzelkabir-deploy-web`)**, not apps/api's key — same leak-radius reasoning as the original SSH hardening. Separate `deploy-web.yml` file (not a second job in `deploy-api.yml`) — the two mechanisms share almost no steps, and it matches this repo's one-artifact-per-file convention. Same `production` environment reused for approval.
-- **nginx**: `deploy/nginx/web.guzelkabir.com.conf` (real now, replaces the `.example` stub) — a `www.guzelkabir.com` → apex 301 redirect block (user-approved, avoids duplicate content + simplifies `CORS_ORIGIN`) plus the real `guzelkabir.com` block. One cert, two names.
+- **nginx**: `deploy/nginx/web.guzelkabir.com.conf` (real now, replaces the `.example` stub) — a `www.guzelkabir.com` → apex 301 redirect plus the real `guzelkabir.com` static-serving block. One cert, two names.
+- **Real bug found live, fixed**: `certbot --nginx`'s own auto-redirect logic rewrote the `www` block's custom apex-redirect with its own generic same-host redirect (`http://www` was going to `https://www`, not the apex). Fixed by hand-authoring all four blocks (HTTP+HTTPS × apex+`www`) ourselves — certbot's role is issuance only (`certonly`) now, never editing this file again.
+- **Also confirmed, not just theorized**: the accompanying `403` (not `404`) on the apex before the first deploy was standard nginx behavior for an empty directory under `try_files` with `autoindex` off — resolved to `200` the moment a real deploy landed, proving it wasn't a permissions bug.
 
-**Not yet done**: nothing has run against the real droplet — no SSL cert issued yet, `guzelkabir-deploy-web` not generated, `/var/www/guzelkabir-web` doesn't exist, `DEPLOY_SSH_KEY_WEB` not in GitHub secrets. Built and locally verified, not live.
+**✅ Live-verified, fully closed.** All four redirect combinations confirmed correct via `curl`, `guzelkabir.com` returns `200` after a real `Deploy Web` run, confirmed live in an actual browser. `apps/api` + `apps/web` are both genuinely live in production now — `apps/admin` is the only frontend left without a deploy pipeline.
 
 ## 7. Deployment workflow
 
-See §6.16/§6.17 above for the real detail. `apps/api` deploys via Docker Compose + existing nginx + certbot; `apps/web` deploys as a static export built in GitHub Actions and shipped over a separate forced-command SSH key — both gated behind the same `production` environment approval, both documented in `deploy/README.md`. `apps/api` is live-verified (`api.guzelkabir.com`); `apps/web`'s pipeline is built but not yet run. `apps/admin` has no deploy pipeline yet.
+See §6.16/§6.17 above for the real detail. `apps/api` deploys via Docker Compose + existing nginx + certbot; `apps/web` deploys as a static export built in GitHub Actions and shipped over a separate forced-command SSH key — both gated behind the same `production` environment approval, both documented in `deploy/README.md`. Both are live-verified: `api.guzelkabir.com` and `guzelkabir.com`. `apps/admin` has no deploy pipeline yet — the only one of the three frontends still missing one.
 
 Always run `npm run build` locally before pushing — CI (`.github/workflows/ci.yml`) runs the same lint/typecheck/build and will fail on type errors.
 
