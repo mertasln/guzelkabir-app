@@ -39,6 +39,21 @@ name: Deploy API (production)
 # okuyabilir, mode 600) yerel olarak duruyor, remote-deploy.sh onu oradan
 # okuyor (bkz. deploy/README.md §3). GitHub secrets listesinde artık bir
 # DOPPLER_TOKEN YOK.
+#
+# ⚠️ Host key pinning (kullanıcı talebi, gerçek gap düzeltmesi) — bu adım
+# eskiden `appleboy/ssh-action`'ı `fingerprint:` VERMEDEN kullanıyordu, yani
+# hiçbir host key doğrulaması yapmıyordu (action'ın dokümantasyonu
+# fingerprint verilmediğinde ne olduğunu bile belirtmiyor). Şimdi ham `ssh`
+# çağrısına geçildi — deploy-web.yml'deki AYNI pinleme deseniyle: droplet'in
+# gerçek host public key'i (kullanıcı tarafından doğrudan droplet'ten,
+# `cat /etc/ssh/ssh_host_ed25519_key.pub` ile okunup buraya yapıştırıldı —
+# ağ üzerinden değil, bu yüzden bir MITM tarafından sahtelenemez) aşağıda
+# düz metin olarak duruyor (gizli değil, herkese açık bir anahtar) ve
+# bağlanmadan HEMEN önce gerçek bir known_hosts dosyasına yazılıp
+# `StrictHostKeyChecking=yes` ile zorunlu kılınıyor — "ilk bağlantı gibi
+# davran" (accept-new, GitHub Actions'ın her çalıştırmada boş bir
+# known_hosts'la başlaması yüzünden fiilen "asla doğrulama" anlamına
+# geliyordu) değil, her seferinde gerçek kriptografik doğrulama.
 on:
   # spec §13.2 adım 30-32 (lint/test/integration) BAŞARIYLA bitmeden deploy
   # pipeline'ı hiç başlamasın diye `push` değil, mevcut CI workflow'unun
@@ -60,16 +75,28 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     environment: production
+    env:
+      # Droplet'in gerçek SSH host public key'i — gizli değil (herkese açık
+      # anahtar), bu yüzden düz metin. deploy-web.yml'deki AYNI değer.
+      DEPLOY_SSH_HOST_KEY: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH1jUCMOT7k9MjaVMjLslqiOSjA3JpZPfCY7/tP/c4/h"
     steps:
       - name: Trigger deploy (forced SSH command runs deploy/remote-deploy.sh)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_SSH_HOST }}
-          username: ${{ secrets.DEPLOY_SSH_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
-          script_stop: true
-          script: |
-            echo "Bu satırın içeriği önemsiz — authorized_keys'teki command="
-            echo "zorlaması ne gönderilirse gönderilsin deploy/remote-deploy.sh'ı"
-            echo "çalıştırır (bkz. deploy/README.md §2)."
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
+        run: |
+          set -euo pipefail
+          key_file="$(mktemp)"
+          known_hosts_file="$(mktemp)"
+          trap 'rm -f "$key_file" "$known_hosts_file"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key_file"
+          chmod 600 "$key_file"
+          printf '%s %s\n' "$DEPLOY_SSH_HOST" "$DEPLOY_SSH_HOST_KEY" > "$known_hosts_file"
+          # Gönderilen komutun içeriği önemsiz — authorized_keys'teki
+          # command= zorlaması ne gönderilirse gönderilsin
+          # deploy/remote-deploy.sh'ı çalıştırır (bkz. deploy/README.md §2).
+          ssh -i "$key_file" -p "$DEPLOY_SSH_PORT" \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts_file" \
+            "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" "echo ignored"

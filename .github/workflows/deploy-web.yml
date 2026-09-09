@@ -19,6 +19,21 @@ name: Deploy Web (production)
 # piped-tarball approach work at all under this restriction (scp/rsync's
 # own remote-invocation protocol would NOT work here, since the forced
 # command replaces whatever they'd try to invoke server-side).
+#
+# ⚠️ Host key pinning (user-requested, real gap fix): this used to connect
+# with `-o StrictHostKeyChecking=accept-new`, which sounds safer than it
+# is — its real protection (reject a host key that changes *after* the
+# first trusted connection) depends on a known_hosts file persisting
+# between connections, but GitHub Actions runners start with an empty one
+# every single run. So it was trust-on-first-use on *every* run, not just
+# the first ever — practically equivalent to no verification at all. Fixed
+# by pinning the droplet's actual host public key below (read directly off
+# the droplet by the user via `cat /etc/ssh/ssh_host_ed25519_key.pub` —
+# never over the network, so it can't itself be MITM'd) — not secret, a
+# plain literal — written into a real known_hosts file immediately before
+# connecting, with `StrictHostKeyChecking=yes` enforcing it for real, every
+# single run. deploy-api.yml uses the identical pattern now, for
+# consistency.
 on:
   workflow_run:
     workflows: [CI]
@@ -45,6 +60,9 @@ jobs:
       # own comment on this exact issue). Reusing ci.yml's existing fake
       # placeholder secret, not inventing a new one.
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Droplet's real SSH host public key — not secret, deploy-api.yml
+      # uses the identical value/pattern.
+      DEPLOY_SSH_HOST_KEY: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH1jUCMOT7k9MjaVMjLslqiOSjA3JpZPfCY7/tP/c4/h"
     steps:
       - uses: actions/checkout@v4
 
@@ -83,9 +101,11 @@ jobs:
         run: |
           set -euo pipefail
           key_file="$(mktemp)"
-          trap 'rm -f "$key_file"' EXIT
+          known_hosts_file="$(mktemp)"
+          trap 'rm -f "$key_file" "$known_hosts_file"' EXIT
           printf '%s\n' "$DEPLOY_SSH_KEY_WEB" > "$key_file"
           chmod 600 "$key_file"
+          printf '%s %s\n' "$DEPLOY_SSH_HOST" "$DEPLOY_SSH_HOST_KEY" > "$known_hosts_file"
           tar -czf - -C apps/web/out . | ssh -i "$key_file" -p "$DEPLOY_SSH_PORT" \
-            -o StrictHostKeyChecking=accept-new \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts_file" \
             "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST"
