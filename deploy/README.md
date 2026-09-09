@@ -73,23 +73,32 @@ sudo certbot --nginx -d api.guzelkabir.com   # yalnızca bu domain'e ait server 
 
 O sırada **yalnızca `api.guzelkabir.com` için** sertifika alınmıştı — `guzelkabir.com` şimdi (ADIM 12) hazır, `admin.guzelkabir.com` hâlâ bilinçli olarak dışarıda (apps/admin'in henüz gerçek bir deploy hikayesi yok — `admin.guzelkabir.com.conf.example` hâlâ `.example`, `sites-enabled`'a bağlanmasın).
 
-**apps/web'i etkinleştir (ADIM 12) — `berber`'e dokunmadan, ayrı/bağımsız iki server block:**
+**apps/web'i etkinleştir (ADIM 12) — `berber`'e dokunmadan, dört bağımsız server block (http+https × apex+www):**
+
+⚠️ **Gerçek bug, canlı testte bulundu ve düzeltildi — `certbot --nginx -d ... -d ...`'in KENDİ otomatik HTTP→HTTPS redirect mantığı, www block'undaki bizim apex'e-yönlendirme gövdemizi KENDİ "aynı host'a yönlendir" davranışıyla EZMİŞTİ** (`curl -I http://www.guzelkabir.com` apex yerine www'nin kendisine (https) yönlendiriyordu). `deploy/nginx/web.guzelkabir.com.conf` artık HTTP+HTTPS'in DÖRDÜNÜ de (apex×www) kendi içinde elle tanımlıyor — certbot'un rolü artık yalnızca sertifika ÜRETMEK, bu dosyanın redirect/serving mantığını bir daha DÜZENLEMEMELİ.
+
+**Sertifika henüz yoksa (ilk kurulum), önce `certonly` ile İZOLE üret — düzenleyen `--nginx` modu DEĞİL:**
+```bash
+sudo certbot certonly --nginx -d guzelkabir.com -d www.guzelkabir.com
+```
+`certonly`, ACME doğrulaması için nginx'i geçici olarak kullanır ama server block'ların gövdesini HİÇ düzenlemez — yalnızca `/etc/letsencrypt/live/guzelkabir.com/`'a sertifika dosyalarını yazar (lineage adı ilk `-d` domain'inden gelir — farklıysa `sudo certbot certificates` ile doğrula ve `deploy/nginx/web.guzelkabir.com.conf`'taki `ssl_certificate` yollarını ona göre düzelt). Sertifika zaten varsa (mevcut durum) bu adımı atla.
+
+**Sonra bizim tam config'i deploy et (certbot'un daha önce düzenlediği eski hâlin TAMAMEN YERİNE):**
 ```bash
 sudo cp /opt/guzelkabir/deploy/nginx/web.guzelkabir.com.conf /etc/nginx/sites-available/
-sudo ln -s /etc/nginx/sites-available/web.guzelkabir.com.conf /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/web.guzelkabir.com.conf /etc/nginx/sites-enabled/
 sudo nginx -t          # mevcut config'i (api.guzelkabir.com, yakupmertaslan.com, berber) BOZMADIĞINI doğrula
 sudo systemctl reload nginx
-sudo certbot --nginx -d guzelkabir.com -d www.guzelkabir.com   # tek sertifika, iki isim
 ```
-`www.guzelkabir.com` → `guzelkabir.com` 301 yönlendirmesi dosyanın kendisinde tanımlı (kullanıcı onaylı karar, ADIM 12 planlaması) — certbot yine de her iki isim için de kendi 443 bloğunu ekleyecek (redirect HTTPS üzerinden de çalışsın diye).
 
-**⚠️ "certbot otomatik ekleyecek" bir varsayımdır, kanıt değil — certbot çalıştıktan sonra gerçekten doğrula:**
+**⚠️ "Doğru olmalı" bir varsayımdır, kanıt değil — reload sonrası gerçekten doğrula:**
 ```bash
 curl -I http://www.guzelkabir.com     # beklenen: 301, Location: https://guzelkabir.com/
-curl -I https://www.guzelkabir.com    # beklenen: 301 (SSL hatası YOK — sertifika www için de geçerli olmalı), Location: https://guzelkabir.com/
-curl -I https://guzelkabir.com        # beklenen: 200 — asıl hedef gerçekten içerik servis ediyor
+curl -I https://www.guzelkabir.com    # beklenen: 301 (SSL hatası YOK), Location: https://guzelkabir.com/
+curl -I http://guzelkabir.com         # beklenen: 301, Location: https://guzelkabir.com/
+curl -I https://guzelkabir.com        # beklenen: 200 (deploy henüz yapılmadıysa 403 — bkz. CLAUDE.md "apps/web (ADIM 12)" notu, /var/www/guzelkabir-web boş olduğu için beklenen davranış, bir config hatası değil)
 ```
-Üçü de beklenen çıktıyı vermeden bu ADIM'ı "doğrulandı" saymayın.
+Dördü de beklenen çıktıyı vermeden bu ADIM'ı "doğrulandı" saymayın.
 
 Let's Encrypt'in haftalık limiti (registered domain başına 50 sertifika, tüm subdomain'ler dahil) toplam 3-4 sertifika için gerçek bir kısıt değil — `admin.guzelkabir.com`'u ileride ayrı almanın maliyeti yok.
 
